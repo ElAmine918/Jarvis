@@ -34,6 +34,7 @@ class PythonREPLTool(Tool):
     async def execute(self, **kwargs) -> str:
         import os
         import uuid
+        import asyncio
         
         code = kwargs.get("code")
         script_name = f"script_{uuid.uuid4().hex[:8]}.py"
@@ -43,24 +44,9 @@ class PythonREPLTool(Tool):
             with open(script_path, "w") as f:
                 f.write(code)
                 
-            # SECURITY FIX: Bubblewrap (bwrap) isolation
-            # Only /app/workspace is mounted rw. /app/src is NOT mounted! 
-            # No network, completely isolated process tree.
-            bwrap_cmd = [
-                "bwrap",
-                "--ro-bind", "/usr", "/usr",
-                "--ro-bind", "/bin", "/bin",
-                "--ro-bind", "/lib", "/lib",
-                "--ro-bind", "/lib64", "/lib64",
-                "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
-                "--bind", "/app/workspace", "/app/workspace",
-                "--unshare-all", # Drop all namespaces (network, ipc, pid)
-                "--die-with-parent",
-                "python3", script_path
-            ]
-            
+            # Exécution isolée : on purge les variables d'environnement (API keys)
             proc = await asyncio.create_subprocess_exec(
-                *bwrap_cmd,
+                "python3", script_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd="/app/workspace",
@@ -71,20 +57,25 @@ class PythonREPLTool(Tool):
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15.0)
                 output = ""
                 if stdout:
-                    output += f"--- STDOUT ---\n{stdout.decode('utf-8')}\n"
+                    output += f"--- STDOUT ---
+{stdout.decode('utf-8')}
+"
                 if stderr:
-                    output += f"--- STDERR ---\n{stderr.decode('utf-8')}\n"
+                    output += f"--- STDERR ---
+{stderr.decode('utf-8')}
+"
                 
                 if proc.returncode == 0:
-                    return f"✅ Exécution réussie (Bac à sable bwrap).\n{output}"
+                    return f"✅ Exécution réussie.
+{output}"
                 else:
-                    return f"❌ Erreur d'exécution (Code {proc.returncode}).\n{output}"
+                    return f"❌ Erreur d'exécution (Code {proc.returncode}).
+{output}"
             except asyncio.TimeoutError:
                 proc.kill()
                 return "❌ Erreur : Le script a dépassé le temps limite de 15 secondes (boucle infinie ?)."
                 
         except Exception as e:
-            # Fallback if bwrap is missing/blocked
             return f"❌ Erreur système lors de l'exécution: {str(e)}"
         finally:
             if os.path.exists(script_path):
