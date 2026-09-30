@@ -70,8 +70,7 @@ class GitTool(Tool):
             if stdout:
                 output += stdout.decode('utf-8')
             if stderr:
-                output += "
-(Stderr): " + stderr.decode('utf-8')
+                output += "\n(Stderr): " + stderr.decode('utf-8')
                 
             return output if output else "✅ Commande exécutée avec succès (sans sortie)."
         except Exception as e:
