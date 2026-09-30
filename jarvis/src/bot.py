@@ -134,7 +134,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation
-        log_conversation("telegram", str(user_id), user_text, response)
+        log_conversation("telegram", str(user_id), user_text, response, agent.last_backend_used)
         
         await _send_long(update, response)
     except Exception as e:

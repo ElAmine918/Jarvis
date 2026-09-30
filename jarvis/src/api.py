@@ -113,7 +113,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                     response_text = await agent.process_message(messages_dicts, body.model)
                     from .logger_db import log_conversation
                     last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
-                    log_conversation("open-webui", "local", last_user_msg, response_text, body.model)
+                    log_conversation("open-webui", "local", last_user_msg, response_text, agent.last_backend_used)
                     
                     chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
                     chunk = {
@@ -145,7 +145,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         response_text = await agent.process_message(messages_dicts, body.model)
         from .logger_db import log_conversation
         last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
-        log_conversation("open-webui", "local", last_user_msg, response_text, body.model)
+        log_conversation("open-webui", "local", last_user_msg, response_text, agent.last_backend_used)
     except Exception as e:
         logger.error(f"Erreur agent: {e}")
         raise HTTPException(status_code=500, detail=str(e))

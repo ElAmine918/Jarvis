@@ -19,6 +19,7 @@ class JarvisAgent:
     def __init__(self):
         self.tool_registry = get_default_registry()
         self.memory = MemoryManager()
+        self.last_backend_used = "En attente"
 
     async def init(self):
         await self.memory.init_db()
@@ -86,10 +87,7 @@ class JarvisAgent:
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
                 
-                # Ajout de la signature si on est en mode auto
-                if requested_model == "jarvis-auto":
-                    yield f"\n\n_— ⚡️ Répondu via {b_name}_"
-                    
+                self.last_backend_used = f"{b_name} ({b_model})"
                 return # Succès
             except Exception as e:
                 logger.warning(f"Backend stream {b_name} a échoué: {e}")
@@ -161,10 +159,7 @@ class JarvisAgent:
                 continue
 
             final_text = message.content or ""
-            
-            if requested_model == "jarvis-auto":
-                final_text += f"\n\n_— ⚡️ Répondu via {b_name}_"
-                
+            self.last_backend_used = f"{b_name} ({b_model})"
             return final_text
 
         return "⚠️ Limite d'itérations atteinte. Réessaie en reformulant ta demande."

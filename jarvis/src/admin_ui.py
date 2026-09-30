@@ -209,7 +209,10 @@ DASHBOARD_HTML = """
                                         <i class="fa-solid fa-robot text-[9px]"></i>
                                         <span>Jarvis</span>
                                     </span>
-                                    <span v-if="c.model_used" class="font-mono text-[9px] text-slate-500 lowercase">{{ c.model_used }}</span>
+                                    <span v-if="c.model_used" class="px-2 py-0.5 rounded-md bg-dark-900 text-brand-cyan border border-brand-cyan/20 font-mono text-[10px] font-semibold flex items-center space-x-1">
+                                        <i class="fa-solid fa-server text-[8px]"></i>
+                                        <span>{{ c.model_used }}</span>
+                                    </span>
                                 </div>
                                 <div class="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed font-sans">{{ c.message_out }}</div>
                             </div>

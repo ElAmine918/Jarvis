@@ -73,11 +73,6 @@ services:
     cap_add:
       - SETUID                   # nécessaire pour l'utilisateur jarvis
       - SETGID
-    deploy:
-      resources:
-        limits:
-          memory: 512M           # max RAM pour le processus Python
-          cpus: "1.0"
     labels:
       - "jarvis.manageable=false"
     logging:
@@ -145,6 +140,9 @@ services:
     image: ollama/ollama:latest
     container_name: ollama
     restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "24h"
+      OLLAMA_NUM_PARALLEL: 1
     volumes:
       - ollama-data:/root/.ollama
     networks:
