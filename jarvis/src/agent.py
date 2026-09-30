@@ -116,6 +116,8 @@ class JarvisAgent:
                     
                     final_text = ""
                     tool_calls_dict = {}
+                    active_index_map = {}
+                    true_idx_counter = 0
                     
                     async for chunk in stream_response:
                         if not chunk.choices:
@@ -127,9 +129,16 @@ class JarvisAgent:
                             
                         if delta.tool_calls:
                             for tc_chunk in delta.tool_calls:
-                                idx = tc_chunk.index
-                                if idx not in tool_calls_dict:
-                                    tool_calls_dict[idx] = {
+                                prov_idx = tc_chunk.index
+                                
+                                # Provider bug fix: some providers stream multiple tools but reuse index=0.
+                                # A new tool ALWAYS has an 'id' in its first chunk.
+                                if getattr(tc_chunk, "id", None) is not None:
+                                    true_idx = true_idx_counter
+                                    true_idx_counter += 1
+                                    active_index_map[prov_idx] = true_idx
+                                    
+                                    tool_calls_dict[true_idx] = {
                                         "id": tc_chunk.id,
                                         "type": "function",
                                         "function": {
@@ -138,10 +147,18 @@ class JarvisAgent:
                                         }
                                     }
                                 else:
+                                    true_idx = active_index_map.get(prov_idx, prov_idx)
+                                    if true_idx not in tool_calls_dict:
+                                        tool_calls_dict[true_idx] = {
+                                            "id": f"call_{true_idx}",
+                                            "type": "function",
+                                            "function": {"name": "", "arguments": ""}
+                                        }
+                                        
                                     if getattr(tc_chunk.function, "name", None):
-                                        tool_calls_dict[idx]["function"]["name"] += tc_chunk.function.name
+                                        tool_calls_dict[true_idx]["function"]["name"] += tc_chunk.function.name
                                     if getattr(tc_chunk.function, "arguments", None):
-                                        tool_calls_dict[idx]["function"]["arguments"] += tc_chunk.function.arguments
+                                        tool_calls_dict[true_idx]["function"]["arguments"] += tc_chunk.function.arguments
 
                     current_backend = b_name
                     current_model = model
