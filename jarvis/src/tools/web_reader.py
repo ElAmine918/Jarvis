@@ -128,3 +128,56 @@ class WebReaderTool(Tool):
             
         except Exception as e:
             return f"❌ Erreur lors de la lecture : {e}"
+
+
+class NewsSearchTool(Tool):
+
+    @property
+    def name(self) -> str:
+        return "search_news"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Recherche les actualités et nouvelles récentes en direct sur un sujet, pays ou mot-clé (ex: 'canada', 'ia', 'france'). "
+            "Renvoie les titres et dates des articles d'actualité les plus récents."
+        )
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Le sujet ou pays dont on cherche les actualités récentes (ex: 'canada', 'technologie', 'montreal')."
+                }
+            },
+            "required": ["query"]
+        }
+
+    async def execute(self, query: str, **kwargs) -> str:
+        import urllib.parse
+        import xml.etree.ElementTree as ET
+
+        encoded = urllib.parse.quote(query)
+        url = f"https://news.google.com/rss/search?q={encoded}&hl=fr&gl=CA&ceid=CA:fr"
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+                res = await client.get(url)
+                res.raise_for_status()
+
+            root = ET.fromstring(res.content)
+            items = root.findall(".//item")
+            if not items:
+                return f"Aucune actualité trouvée pour '{query}'."
+
+            lines = [f"📰 Actualités récentes pour '{query}' :\n"]
+            for item in items[:6]:
+                title = item.find("title").text if item.find("title") is not None else "Sans titre"
+                pub_date = item.find("pubDate").text if item.find("pubDate") is not None else ""
+                lines.append(f"• {title} ({pub_date})")
+
+            return "\n".join(lines)
+        except Exception as e:
+            return f"❌ Erreur recherche actualités : {e}"

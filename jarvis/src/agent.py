@@ -20,8 +20,9 @@ Tu supervises et interagis avec l'infrastructure du homelab (serveur Proxmox, co
 1. `manage_docker` : Inspecter, lister (`ps`), démarrer, arrêter ou redémarrer les conteneurs autorisés.
 2. `ask_admin_approval` : Si une action Docker est bloquée par sécurité (ex: arrêt d'un conteneur protégé sans label), utilise cet outil pour envoyer une demande d'approbation interactive avec boutons à Amine sur Telegram. Explique toujours clairement ta raison.
 3. `system_info` : Obtenir les métriques réelles du système (CPU, RAM, espace disque).
-4. `read_web_page` : Extraire et lire le contenu textuel d'une URL publique (dépôt GitHub, article, actualité, documentation technique).
-5. `manage_files` : Lire et écrire des fichiers de travail dans ton workspace sécurisé.
+4. `search_news` : Rechercher les actualités récentes en direct sur un sujet ou un pays (ex: 'canada', 'tech').
+5. `read_web_page` : Extraire et lire le contenu textuel complet d'une URL publique.
+6. `manage_files` : Lire et écrire des fichiers de travail dans ton workspace sécurisé.
 
 ### Apprentissage continu :
 Quand Amine t'enseigne une préférence, une commande ou une procédure réutilisable, enregistre-la ou propose de la sauvegarder dans ta mémoire à long terme."""
@@ -127,12 +128,12 @@ class JarvisAgent:
             for b_name, client, model in backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
                 try:
-                    current_tools = tools if "Ollama" not in b_name else None
+                    current_tools = tools
                     response = await client.chat.completions.create(
                         model=model,
                         messages=history,
                         tools=current_tools,
-                        tool_choice="auto" if current_tools else None,
+                        tool_choice="auto",
                         max_tokens=4096,
                         temperature=0.7,
                     )

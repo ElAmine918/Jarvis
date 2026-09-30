@@ -3,11 +3,11 @@ from .shell import ShellTool
 from .docker_tool import DockerTool
 from .filesystem import FileSystemTool
 from .system_info import SystemInfoTool
-from .web_reader import WebReaderTool
+from .web_reader import WebReaderTool, NewsSearchTool
 from .admin_tool import AdminActionTool
 
 __all__ = ["Tool", "ToolRegistry", "ShellTool", "DockerTool",
-           "FileSystemTool", "SystemInfoTool", "WebReaderTool", "AdminActionTool"]
+           "FileSystemTool", "SystemInfoTool", "WebReaderTool", "NewsSearchTool", "AdminActionTool"]
 
 def get_default_registry() -> ToolRegistry:
     registry = ToolRegistry()
@@ -16,5 +16,6 @@ def get_default_registry() -> ToolRegistry:
     registry.register(FileSystemTool())
     registry.register(SystemInfoTool())
     registry.register(WebReaderTool())
+    registry.register(NewsSearchTool())
     registry.register(AdminActionTool())
     return registry

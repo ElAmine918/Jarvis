@@ -5,7 +5,12 @@ from telegram import Update
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-from .config import TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS, LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT
+from .config import (
+    TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS, 
+    LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT,
+    OLLAMA_LOCAL_URL, OLLAMA_LOCAL_MODEL,
+    GEMINI_API_KEY
+)
 from .agent import JarvisAgent
 from .router import check_endpoint
 
@@ -57,19 +62,42 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
 
+    agent: JarvisAgent = context.bot_data["agent"]
     uptime = datetime.datetime.now() - START_TIME
-    cpu = psutil.cpu_percent(interval=0.5)
+    uptime_str = str(uptime).split('.')[0]
+    
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    cpu_count = psutil.cpu_count(logical=True)
     ram = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    
+    ram_used_gb = round(ram.used / (1024**3), 1)
+    ram_total_gb = round(ram.total / (1024**3), 1)
+    disk_free_gb = round(disk.free / (1024**3), 1)
 
-    lm_up = await check_endpoint(LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT)
-    backend_str = "🟢 LM Studio (local)" if lm_up else "🟡 Fallback (Gemini/Ollama)"
+    # Vérification des moteurs
+    lm_up = await check_endpoint(LM_STUDIO_URL, 1.5)
+    ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 1.5)
+
+    if lm_up:
+        active_engine = "🍏 Mac M4 (LM Studio - Qwen 3.5 9B)"
+    elif bool(GEMINI_API_KEY):
+        active_engine = "☁️ Gemini Flash (Google Cloud)"
+    elif ollama_up:
+        active_engine = f"🦙 Toshiba Local (Ollama - {OLLAMA_LOCAL_MODEL})"
+    else:
+        active_engine = "🔴 Aucun moteur disponible"
 
     msg = (
-        f"📊 *Jarvis Status*\n\n"
-        f"⏱ Uptime : `{str(uptime).split('.')[0]}`\n"
-        f"💻 CPU : `{cpu}%`\n"
-        f"🧠 RAM : `{ram.percent}%` ({ram.used // 1024**2} MB / {ram.total // 1024**2} MB)\n"
-        f"🤖 Backend LLM : {backend_str}"
+        "📊 *RAPPORT SYSTÈME JARVIS*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏱ *Disponibilité* : `{uptime_str}`\n"
+        f"💻 *CPU Proxmox* : `{cpu_percent}%` ({cpu_count} cœurs alloués)\n"
+        f"🧠 *RAM Utilisée* : `{ram.percent}%` ({ram_used_gb} Go / {ram_total_gb} Go)\n"
+        f"💾 *Disque Système* : `{disk.percent}%` ({disk_free_gb} Go libres)\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 *Moteur actif* :\n└ {active_engine}\n"
+        f"🎯 *Dernière exécution* : `{agent.last_backend_used}`"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
@@ -77,11 +105,40 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
-    lm_up = await check_endpoint(LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT)
+
+    agent: JarvisAgent = context.bot_data["agent"]
+
+    lm_up = await check_endpoint(LM_STUDIO_URL, 2.5)
+    ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 1.5)
+
+    # Statuts détaillés
+    t1_status = "🟢 En ligne (`qwen/qwen3.5-9b`)" if lm_up else "🔴 Inaccessible (Mac éteint ou hors Tailscale)"
+    t2_status = "🟢 Configuré (Clé API active)" if GEMINI_API_KEY else "⚪️ Non configuré"
+    t3_status = f"🟢 En ligne (`{OLLAMA_LOCAL_MODEL}` - 8 cœurs)" if ollama_up else "🔴 Inaccessible"
+
     if lm_up:
-        await update.message.reply_text("🟢 LM Studio actif — utilisation du modèle local sur ton Mac.")
+        lead = "🍏 *Tier 1 : Mac M4 (LM Studio)* prend la priorité."
+    elif GEMINI_API_KEY:
+        lead = "☁️ *Tier 2 : Gemini Flash (Cloud)* prend le relais (Mac hors-ligne)."
+    elif ollama_up:
+        lead = "🦙 *Tier 3 : Toshiba (Ollama)* actif en survie locale autonome."
     else:
-        await update.message.reply_text("🟡 LM Studio inaccessible — fallback auto.")
+        lead = "❌ Aucun backend ne répond actuellement."
+
+    msg = (
+        "🤖 *ARCHITECTURE DES MOTEURS IA*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"1️⃣ *Tier 1 (Performance - Mac M4)* :\n"
+        f"   └ {t1_status}\n\n"
+        f"2️⃣ *Tier 2 (Cloud Fallback - Google)* :\n"
+        f"   └ {t2_status}\n\n"
+        f"3️⃣ *Tier 3 (Survie Locale - Toshiba)* :\n"
+        f"   └ {t3_status}\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👉 *Priorité actuelle* :\n{lead}\n\n"
+        f"ℹ️ *Dernier modèle utilisé* :\n`{agent.last_backend_used}`"
+    )
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE):
