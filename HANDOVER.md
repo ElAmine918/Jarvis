@@ -155,14 +155,15 @@ L'utilisateur a remarqué lors des tests que seuls 4 cœurs étaient à 100% dan
   - `/help` : Manuel d'utilisation complet.
 - **Sécurité :** Filtrage strict par `ALLOWED_TELEGRAM_USER_IDS` dans `.env`.
 
-### 6.2. Dashboard d'Administration (`jarvis/src/admin_ui.py`)
+### 6.2. Dashboard d'Administration (JARVIS OS - Neural Command Center)
 - Accessible sur : `http://192.168.2.76:8080/admin`
 - Endpoint API de données : `http://192.168.2.76:8080/admin/api/data`
-- Interface Web moderne Vue.js 3 + Tailwind CSS :
-  - Badges de statut en direct des 4 backends (LM Studio, OpenRouter, Gemini, Ollama).
-  - Monitoring CPU & RAM en temps réel.
-  - Historique complet des conversations et des appels d'outils (`browse_internet`, `docker_exec`, etc.).
-  - Indication précise de la machine et du modèle ayant répondu à chaque requête.
+- Interface SPA ultra-moderne "Glassmorphism & Cyberpunk" (Dark Mode) avec Vue 3 :
+  - Jauges circulaires SVG animées pour la télémétrie Core (CPU/RAM).
+  - Neural Pathways (Routage LLM) affichant le statut live des 4 Tiers avec lueurs néon.
+  - Token Economy (Analyse de coût) avec estimation dynamique des économies Cloud.
+  - Live Action Terminal (Mode Hacker) : affichage temps réel des subroutines (appels d'outils).
+  - Comms Intercept : historique des requêtes façon messagerie chiffrée.
 
 ### 6.3. Open WebUI & Modèles Exposés (`jarvis/src/api.py`)
 - Accessible sur : `http://192.168.2.76:3000` (ou via Tailscale `http://100.122.16.8:3000`)
@@ -215,3 +216,23 @@ Pour empêcher l'agent ou un conteneur compromis de prendre le contrôle de l'h�
 | **Jarvis répond lentement (>15s)** | Mac M4 éteint et fallback sur Ollama local Toshiba | Normal (inférence CPU à 5.3 tok/s). Si OpenRouter est actif, vérifier les quotas de l'API gratuite. |
 | **Erreur de permission Docker** | Tentative de manipulation directe du socket | Utiliser uniquement `DOCKER_HOST="tcp://docker-proxy:2375"`. |
 | **Mise à jour de code non prise en compte** | Fichier modifié sur le Mac mais pas poussé sur LXC 100 | Lancer le script de push tarball et `docker compose restart jarvis`. |
+
+## 10. 🧠 Outils et Capacités Avancées (v6.0)
+
+Jarvis dispose d'un arsenal d'outils avancés pour interagir avec le monde et d'autres agents.
+
+### 10.1. Outils Multi-Agent
+- **`delegate_to_subagent`** : Délégation de sous-tâches à des agents plus rapides (Gemini, Ollama).
+- **`consult_advisor`** : Appel d'un modèle supérieur pour un second avis critique.
+- **`fusion_panel_analysis`** : Envoi parallèle d'une requête à plusieurs LLMs, puis synthèse.
+
+### 10.2. Outils Système & Sécurité
+- **`manage_docker`** : Gestion des conteneurs via le proxy.
+- **`ask_admin_approval`** : Human-in-the-loop via Telegram pour validation critique.
+- **`manage_files`** / **`apply_patch`** : Lecture, écriture et patching chirurgical de fichiers.
+- **`system_info`** : Surveillance CPU/RAM locale.
+- **`python_interpreter`** : REPL Python sécurisé pour l'exécution locale de calculs.
+- **`git_operations`** : Commandes Git natives dans `/app`.
+- **`schedule_reminder`** : Tâches planifiées asynchrones envoyant des notifications Telegram.
+- **`document_rag_search`** : Lecture rapide et recherche sémantique RAG.
+

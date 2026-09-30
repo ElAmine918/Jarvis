@@ -228,7 +228,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        response = await agent.process_message(history)
+        response = ""
+        async for chunk in agent.process_message(history):
+            response += chunk
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation

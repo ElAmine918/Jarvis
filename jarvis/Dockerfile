@@ -23,6 +23,7 @@ WORKDIR /app
 # on utilise gpg --batch --no-tty pour éviter cette contrainte.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
+    git \
     iproute2 \
     ca-certificates \
     gnupg \

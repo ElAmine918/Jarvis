@@ -6,8 +6,15 @@ from .system_info import SystemInfoTool
 from .web_reader import WebReaderTool, NewsSearchTool
 from .browser_tool import BrowserNavigateTool
 from .admin_tool import AdminActionTool
+from .python_repl import PythonREPLTool
+from .rag_tool import DocumentRAGTool
+from .scheduler_tool import SchedulerTool
+from .git_tool import GitTool
+from .image_tool import ImageGenerationTool
+from .apply_patch import ApplyPatchTool
+from .multi_agent import SubagentTool, AdvisorTool, FusionTool
 
-__all__ = ["Tool", "ToolRegistry", "ShellTool", "DockerTool",
+__all__ = ["Tool", "ToolRegistry", "get_default_registry"]
            "FileSystemTool", "SystemInfoTool", "WebReaderTool", "NewsSearchTool", "BrowserNavigateTool", "AdminActionTool"]
 
 def get_default_registry() -> ToolRegistry:
@@ -20,4 +27,13 @@ def get_default_registry() -> ToolRegistry:
     registry.register(NewsSearchTool())
     registry.register(BrowserNavigateTool())
     registry.register(AdminActionTool())
+    registry.register(SubagentTool())
+    registry.register(AdvisorTool())
+    registry.register(FusionTool())
+    registry.register(ApplyPatchTool())
+    registry.register(ImageGenerationTool())
+    registry.register(PythonREPLTool())
+    registry.register(DocumentRAGTool())
+    registry.register(SchedulerTool())
+    registry.register(GitTool())
     return registry

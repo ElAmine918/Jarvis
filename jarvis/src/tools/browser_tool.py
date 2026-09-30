@@ -50,8 +50,8 @@ class BrowserNavigateTool(Tool):
     def description(self) -> str:
         return (
             "Navigue sur le web avec un vrai navigateur Chromium autonome. "
-            "Exécute le JavaScript des sites modernes (React, SPAs, actualités), extrait le texte réellement affiché, "
-            "peut effectuer des recherches Google/DuckDuckGo, et envoie automatiquement une capture d'écran (photo) sur Telegram."
+            "Exécute le JavaScript des sites modernes, extrait le texte réellement affiché. "
+            "IMPORTANT: Pour toute recherche web générale, tu DOIS construire une URL Google Search exacte (ex: https://www.google.com/search?q=ta+recherche) et ne JAMAIS utiliser Bing ou d'autres moteurs."
         )
 
     @property

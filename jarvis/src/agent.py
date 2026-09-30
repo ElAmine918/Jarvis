@@ -16,14 +16,6 @@ Tu supervises et interagis avec l'infrastructure du homelab (serveur Proxmox, co
 - Privilégie l'action : si une question porte sur l'état du serveur, un conteneur, un fichier ou une info en ligne, appelle directement tes outils pour obtenir les données réelles au lieu d'extrapoler ou de deviner.
 - Ne rajoute JAMAIS de signature manuelle ("Répondu via...") à la fin de tes réponses.
 
-### Outils disponibles :
-1. `manage_docker` : Inspecter, lister (`ps`), démarrer, arrêter ou redémarrer les conteneurs autorisés.
-2. `ask_admin_approval` : Si une action Docker est bloquée par sécurité (ex: arrêt d'un conteneur protégé sans label), utilise cet outil pour envoyer une demande d'approbation interactive avec boutons à Amine sur Telegram. Explique toujours clairement ta raison.
-3. `system_info` : Obtenir les métriques réelles du système (CPU, RAM, espace disque).
-4. `browse_internet` : Naviguer sur le web avec ton navigateur Chromium autonome (exécute le JavaScript, cherche sur le web, visite n'importe quel site internet et extrait les informations en temps réel).
-5. `search_news` : Rechercher les actualités récentes en direct sur un sujet ou un pays.
-6. `manage_files` : Lire et écrire des fichiers de travail dans ton workspace sécurisé.
-
 ### Apprentissage continu :
 Quand Amine t'enseigne une préférence, une commande ou une procédure réutilisable, enregistre-la ou propose de la sauvegarder dans ta mémoire à long terme."""
 
@@ -63,121 +55,142 @@ class JarvisAgent:
             return [b for b in all_backends if "OpenRouter" in b[0]]
         return all_backends
 
-    def _prepare_history(self, open_webui_messages: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    def _prepare_history(self, open_webui_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         filtered_msgs = []
         for m in open_webui_messages:
             if m["role"] == "system":
                 continue
-            if "Generate a concise title" in m.get("content", "") or "follow_ups" in m.get("content", "") or "JSON" in m.get("content", ""):
-                continue
-            clean_content = m.get("content", "").split("\n\n_— ⚡️ Répondu via")[0]
-            filtered_msgs.append({"role": m["role"], "content": clean_content})
+                
+            content = m.get("content", "")
             
-        history = [{"role": "system", "content": SYSTEM_PROMPT}] + filtered_msgs
+            # Handle multimodal content (list of dicts)
+            if isinstance(content, list):
+                # We keep the list intact for Vision models, but check text parts for filters
+                text_parts = [part["text"] for part in content if part.get("type") == "text"]
+                full_text = " ".join(text_parts)
+                if "Generate a concise title" in full_text or "follow_ups" in full_text or "JSON" in full_text:
+                    continue
+                # For images, we just pass the content as-is so Gemini/OpenRouter can process the base64 or URL
+                filtered_msgs.append({"role": m["role"], "content": content})
+            else:
+                if "Generate a concise title" in content or "follow_ups" in content or "JSON" in content:
+                    continue
+                clean_content = content.split("\n\n_— ⚡️ Répondu via")[0]
+                filtered_msgs.append({"role": m["role"], "content": clean_content})
+            
+        history = [{"role": "system", "content": SYSTEM_PROMPT}] + filtered_msgs[-10:]
         return history
 
-    async def process_message_stream(self, open_webui_messages: List[Dict[str, str]], requested_model: str = "jarvis-auto") -> AsyncGenerator[str, None]:
+
+    async def process_message(self, open_webui_messages: List[Dict[str, Any]], requested_model: str = "jarvis-auto") -> AsyncGenerator[str, None]:
         backends = await self._get_backends_for_model(requested_model)
         if not backends:
             yield f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
             return
 
         history = self._prepare_history(open_webui_messages)
-
-        # Si le message est vide après filtrage, on s'arrête net (évite l'erreur Gemini 400)
-        if len(history) == 1:
-            return
-
-        for b_name, client, model in backends:
-            try:
-                stream_response = await client.chat.completions.create(
-                    model=model,
-                    messages=history,
-                    stream=True,
-                    max_tokens=4096,
-                    temperature=0.7,
-                )
-                async for chunk in stream_response:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-                
-                self.last_backend_used = f"{b_name} ({model})"
-                return # Succès
-            except Exception as e:
-                logger.warning(f"Backend stream {b_name} a échoué: {e}")
-                continue
-
-        yield f"❌ Tous les backends ont échoué pour {requested_model}."
-
-    async def process_message(self, open_webui_messages: List[Dict[str, str]], requested_model: str = "jarvis-auto") -> str:
-        backends = await self._get_backends_for_model(requested_model)
-        if not backends:
-            return f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
-
-        history = self._prepare_history(open_webui_messages)
         
         if len(history) == 1:
-            return ""
+            return
 
         tools = self._build_tools_openai_format()
         max_iterations = 15
 
         for iteration in range(max_iterations):
-            response = None
-            choice = None
-            message = None
             current_backend = ""
             current_model = ""
+            success_backend = False
             
             for b_name, client, model in backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
                 try:
-                    current_tools = tools
-                    response = await client.chat.completions.create(
+                    stream_response = await client.chat.completions.create(
                         model=model,
                         messages=history,
-                        tools=current_tools,
+                        tools=tools,
                         tool_choice="auto",
                         max_tokens=4096,
                         temperature=0.7,
+                        stream=True
                     )
-                    choice = response.choices[0]
-                    message = choice.message
+                    
+                    final_text = ""
+                    tool_calls_dict = {}
+                    
+                    async for chunk in stream_response:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta.content:
+                            final_text += delta.content
+                            yield delta.content
+                            
+                        if delta.tool_calls:
+                            for tc_chunk in delta.tool_calls:
+                                idx = tc_chunk.index
+                                if idx not in tool_calls_dict:
+                                    tool_calls_dict[idx] = {
+                                        "id": tc_chunk.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": tc_chunk.function.name or "",
+                                            "arguments": tc_chunk.function.arguments or ""
+                                        }
+                                    }
+                                else:
+                                    if getattr(tc_chunk.function, "name", None):
+                                        tool_calls_dict[idx]["function"]["name"] += tc_chunk.function.name
+                                    if getattr(tc_chunk.function, "arguments", None):
+                                        tool_calls_dict[idx]["function"]["arguments"] += tc_chunk.function.arguments
+
                     current_backend = b_name
                     current_model = model
+                    success_backend = True
                     break 
                 except Exception as e:
-                    logger.warning(f"Backend {b_name} a échoué: {e}")
+                    logger.warning(f"Backend stream {b_name} a échoué: {e}")
                     continue
             
-            if not response:
-                return f"❌ Tous les backends ont échoué pour {requested_model}."
+            if not success_backend:
+                yield f"❌ Tous les backends ont échoué pour {requested_model}."
+                return
 
-            history.append(message.model_dump(exclude_none=True))
+            assistant_msg = {"role": "assistant"}
+            if final_text:
+                assistant_msg["content"] = final_text
+            
+            tool_calls_list = []
+            if tool_calls_dict:
+                for idx in sorted(tool_calls_dict.keys()):
+                    tool_calls_list.append(tool_calls_dict[idx])
+                assistant_msg["tool_calls"] = tool_calls_list
 
-            if choice.finish_reason == "tool_calls" and getattr(message, "tool_calls", None):
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.function.name
+            history.append(assistant_msg)
+
+            if tool_calls_list:
+                for tool_call in tool_calls_list:
+                    tool_name = tool_call["function"]["name"]
                     import json
                     try:
-                        tool_args = json.loads(tool_call.function.arguments)
+                        tool_args = json.loads(tool_call["function"]["arguments"])
                     except json.JSONDecodeError:
                         tool_args = {}
+                        
+                    yield f"\n\n⚙️ *Exécution de {tool_name}...*\n\n"
+                        
                     from .logger_db import log_action
-                    
                     logger.info(f"Tool call: {tool_name}({tool_args})")
                     result = await self.tool_registry.execute_tool(tool_name, tool_args)
                     log_action("N/A", tool_name, tool_args, result)
                     
                     history.append({
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call["id"],
                         "content": result,
                     })
                 continue
-
-            final_text = message.content or ""
-            self.last_backend_used = f"{current_backend} ({current_model})"
-            return final_text
-
-        return "⚠️ Limite d'itérations atteinte. Réessaie en reformulant ta demande."
+            else:
+                self.last_backend_used = f"{current_backend} ({current_model})"
+                return
+                
+        yield "⚠️ Limite d'itérations atteinte. Réessaie en reformulant ta demande."
