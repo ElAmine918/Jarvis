@@ -78,7 +78,13 @@ class JarvisAgent:
                 clean_content = content.split("\n\n_— ⚡️ Répondu via")[0]
                 filtered_msgs.append({"role": m["role"], "content": clean_content})
             
-        history = [{"role": "system", "content": SYSTEM_PROMPT}] + filtered_msgs[-10:]
+                dynamic_system_prompt = SYSTEM_PROMPT
+        if session_id != 'open-webui':
+            dynamic_system_prompt += "\n\n[INTERFACE: TELEGRAM]\nVous parlez actuellement à l'utilisateur via Telegram. Adoptez la personnalité de Jarvis/Alfred (concis, extrêmement pertinent, très respectueux, avec beaucoup de classe). N'UTILISEZ AUCUN FORMATAGE MARKDOWN (pas d'astérisques, pas de gras, pas de tableaux), utilisez uniquement du texte brut et des sauts de ligne naturels."
+        else:
+            dynamic_system_prompt += "\n\n[INTERFACE: OPEN WEBUI]\nVous parlez à l'utilisateur via une interface web riche. Utilisez pleinement le formatage Markdown (tableaux, gras, listes, code)."
+            
+        history = [{"role": "system", "content": dynamic_system_prompt}] + filtered_msgs[-10:]
         return history
 
 
