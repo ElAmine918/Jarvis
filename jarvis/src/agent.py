@@ -55,7 +55,8 @@ class JarvisAgent:
                 continue
             if "Generate a concise title" in m.get("content", "") or "follow_ups" in m.get("content", "") or "JSON" in m.get("content", ""):
                 continue
-            filtered_msgs.append({"role": m["role"], "content": m.get("content", "")})
+            clean_content = m.get("content", "").split("\n\n_— ⚡️ Répondu via")[0]
+            filtered_msgs.append({"role": m["role"], "content": clean_content})
             
         history = [{"role": "system", "content": SYSTEM_PROMPT}] + filtered_msgs
         return history
@@ -146,8 +147,12 @@ class JarvisAgent:
                         tool_args = json.loads(tool_call.function.arguments)
                     except json.JSONDecodeError:
                         tool_args = {}
+                    from .logger_db import log_action
+                    
                     logger.info(f"Tool call: {tool_name}({tool_args})")
                     result = await self.tool_registry.execute_tool(tool_name, tool_args)
+                    log_action("N/A", tool_name, tool_args, result)
+                    
                     history.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,

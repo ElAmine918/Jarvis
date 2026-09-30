@@ -55,9 +55,12 @@ async def run_api(agent: JarvisAgent):
     await server.serve()
 
 
+from .logger_db import init_db
+
 async def main():
     logger.info("🚀 Démarrage de Jarvis...")
-
+    init_db()
+    
     # Créer et initialiser l'agent (partagé entre Telegram et l'API)
     agent = JarvisAgent()
     await agent.init()

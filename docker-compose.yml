@@ -55,6 +55,8 @@ services:
     environment:
       # Jarvis parle au proxy, PAS au vrai socket
       DOCKER_HOST: "tcp://docker-proxy:2375"
+    ports:
+      - "8080:8080"
     volumes:
       - jarvis-data:/app/data
       - jarvis-workspace:/app/workspace

@@ -8,9 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 
+from .admin_ui import admin_router
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Jarvis API", version="1.0.0")
+
+app.include_router(admin_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -107,6 +111,10 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
             async def generate_agent_stream():
                 try:
                     response_text = await agent.process_message(messages_dicts, body.model)
+                    from .logger_db import log_conversation
+                    last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
+                    log_conversation("open-webui", "local", last_user_msg, response_text, body.model)
+                    
                     chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
                     chunk = {
                         "id": chunk_id,
@@ -135,6 +143,9 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
 
     try:
         response_text = await agent.process_message(messages_dicts, body.model)
+        from .logger_db import log_conversation
+        last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
+        log_conversation("open-webui", "local", last_user_msg, response_text, body.model)
     except Exception as e:
         logger.error(f"Erreur agent: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -132,6 +132,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = await agent.process_message(history)
         history.append({"role": "assistant", "content": response})
+        
+        from .logger_db import log_conversation
+        log_conversation("telegram", str(user_id), user_text, response)
+        
         await _send_long(update, response)
     except Exception as e:
         logger.error(f"Erreur traitement message: {e}")
