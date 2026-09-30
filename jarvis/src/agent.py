@@ -124,6 +124,8 @@ class JarvisAgent:
             response = None
             choice = None
             message = None
+            current_backend = ""
+            current_model = ""
             
             for b_name, client, model in backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
@@ -139,6 +141,8 @@ class JarvisAgent:
                     )
                     choice = response.choices[0]
                     message = choice.message
+                    current_backend = b_name
+                    current_model = model
                     break 
                 except Exception as e:
                     logger.warning(f"Backend {b_name} a échoué: {e}")
@@ -171,7 +175,7 @@ class JarvisAgent:
                 continue
 
             final_text = message.content or ""
-            self.last_backend_used = f"{b_name} ({b_model})"
+            self.last_backend_used = f"{current_backend} ({current_model})"
             return final_text
 
         return "⚠️ Limite d'itérations atteinte. Réessaie en reformulant ta demande."
