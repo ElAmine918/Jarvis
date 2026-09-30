@@ -55,7 +55,7 @@ class JarvisAgent:
             return [b for b in all_backends if "OpenRouter" in b[0]]
         return all_backends
 
-    def _prepare_history(self, open_webui_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _prepare_history(self, open_webui_messages: List[Dict[str, Any]], session_id: str) -> List[Dict[str, Any]]:
         filtered_msgs = []
         for m in open_webui_messages:
             if m["role"] == "system":
@@ -94,7 +94,7 @@ class JarvisAgent:
             yield f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
             return
 
-        history = self._prepare_history(open_webui_messages)
+        history = self._prepare_history(open_webui_messages, session_id)
         
         if len(history) == 1:
             return
