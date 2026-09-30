@@ -1,116 +1,65 @@
-# MyCloud — Jarvis AI Agent
+# Jarvis AI - Autonomous Infrastructure Agent
 
-Agent IA personnel accessible via Telegram, hébergé sur un homelab Proxmox.  
-Jarvis peut exécuter des commandes, gérer des containers Docker, naviguer sur le web, et apprendre de nouvelles procédures.
+Jarvis est un agent d'intelligence artificielle autonome conçu pour gérer, superviser et interagir avec l'infrastructure du homelab (serveur Proxmox / Docker). Il est pensé pour être robuste, hautement disponible (système de cascade de LLMs) et hautement sécurisé (Human-in-the-loop et isolation Docker).
 
-## Architecture
+## 🌟 Fonctionnalités Principales
+
+*   **Intelligence en Cascade (Haute Disponibilité)** : 
+    *   *Tier 1 (Performance)* : Modèle local puissant (Qwen) hébergé sur Mac via LM Studio (réseau Tailscale).
+    *   *Tier 2 (Cloud Fallback)* : Gemini 3.5 Flash si le Mac est éteint ou inaccessible.
+    *   *Tier 3 (Survie Locale)* : Modèle léger (Llama 3.2 1B) hébergé sur un PC Toshiba local via Ollama si internet est coupé.
+*   **Sécurité et Isolation (Docker Socket Proxy)** : Jarvis n'a pas un accès "root" au démon Docker. Il communique via le proxy `tecnativa/docker-socket-proxy` sur un réseau isolé (`docker-proxy-net`), limitant strictement ses actions (lecture, start/stop, pas de suppression ou de création arbitraire). Le conteneur lui-même tourne en *no-new-privileges* avec toutes les capacités Linux retirées (`cap_drop: ALL`).
+*   **Human-in-the-loop (Bot Telegram Interactif)** : L'administrateur peut interagir avec Jarvis via un bot Telegram privé. Lorsqu'une action système critique (ex: arrêter le routeur principal) est requise, Jarvis se met en pause et envoie une **demande d'approbation interactive** (boutons Accepter/Refuser) sur Telegram avant d'exécuter l'action brute.
+*   **Mémoire Persistante (SQLite)** : Jarvis mémorise automatiquement de nouvelles "skills" (compétences ou contextes spécifiques) qu'il apprend au fil de la conversation.
+*   **Accès Web Sécurisé** : Jarvis peut lire des pages web et des dépôts GitHub pour s'informer, avec une protection stricte contre le SSRF (Server-Side Request Forgery) pour l'empêcher de scanner le réseau local interne.
+
+## 🏗️ Architecture
 
 ```text
-┌────────────────────────────────────────────────┐
-│          PROXMOX VE 9 (Bare Metal)             │
-│          Toshiba i7-4700MQ — 16 GB RAM         │
-│                                                │
-│  ┌──────────────────────────────────────────┐  │
-│  │    LXC Container : docker-host           │  │
-│  │    Ubuntu 24.04 — Docker Engine          │  │
-│  │                                          │  │
-│  │  ┌────────────────────────────────────┐  │  │
-│  │  │  jarvis     browser    caddy       │  │  │
-│  │  │  (agent)    (headless) (proxy)     │  │  │
-│  │  │     │                              │  │  │
-│  │  │     ▼                              │  │  │
-│  │  │  Telegram ◄──── Toi                │  │  │
-│  │  └────────────────────────────────────┘  │  │
-│  │                                          │  │
-│  │  ┌────────────────────────────────────┐  │  │
-│  │  │  Tes projets (chess, apps, etc.)   │  │  │
-│  │  └────────────────────────────────────┘  │  │
-│  └──────────────────────────────────────────┘  │
-│                                                │
-│  Tailscale : accès distant chiffré             │
-└────────────────────────────────────────────────┘
+[ Proxmox ] -> [ LXC 100 (Ubuntu) ]
+                        |
+                        +-- [ Docker ]
+                              |-- caddy (Reverse Proxy)
+                              |-- open-webui (Interface Web UI)
+                              |-- docker-proxy (Filtre Sécurité Docker)
+                              |-- jarvis (Cerveau FastAPI / Telegram)
 ```
 
-## Stack
+## 🛠️ Outils de l'Agent
 
-| Composant | Techno |
-|-----------|--------|
-| Hyperviseur | Proxmox VE 9 |
-| Container | LXC (Ubuntu 24.04) |
-| Runtime | Docker + Docker Compose |
-| Agent IA | Python (asyncio) + Claude API |
-| Interface | Telegram Bot |
-| Browser | Chromium headless (browserless) |
-| Reverse proxy | Caddy |
-| Réseau distant | Tailscale |
+*   `manage_docker` : Lister, inspecter et redémarrer les conteneurs (autorisés via le label `jarvis.manageable=true`).
+*   `ask_admin_approval` : Demander la permission à l'administrateur via Telegram pour exécuter une action Docker interdite en bypassant les labels de sécurité.
+*   `system_info` : Récupérer l'état du CPU, de la RAM (via `procps`) et de l'espace disque.
+*   `manage_files` : Lire ou écrire des fichiers exclusivement dans son espace de travail isolé (`/app/workspace` et `/app/data/skills`).
+*   `read_web_page` : Extraire et parser le contenu texte de sites publics.
 
-## Démarrage rapide
+## 🚀 Déploiement
 
-### 1. Préparer le serveur Proxmox
+### Pré-requis
+* Serveur Proxmox avec LXC Ubuntu
+* `create-lxc.sh` et `install-docker.sh` (dans le dossier `setup/`)
+* Un token de Bot Telegram
+* Tailscale (optionnel, pour l'accès aux LLMs locaux déportés)
 
-```bash
-# Sur le Proxmox — créer le container LXC
-chmod +x setup/create-lxc.sh
-./setup/create-lxc.sh
-
-# Dans le LXC — installer Docker + Tailscale
-chmod +x setup/install-docker.sh
-./setup/install-docker.sh
+### Installation
+1. Configurer les variables d'environnement dans `/app/.env` :
+```env
+TELEGRAM_BOT_TOKEN=ton_token
+ALLOWED_TELEGRAM_USER_IDS=ton_id_telegram
+LM_STUDIO_URL=http://<ip-tailscale>:1234/v1
+GEMINI_API_KEY=ta_cle_gemini
+OLLAMA_LOCAL_URL=http://ollama:11434/v1
 ```
-
-### 2. Configurer et lancer Jarvis
-
+2. Compiler et lancer l'agent :
 ```bash
-# Cloner le repo dans le LXC
-git clone https://github.com/ElAmine918/MyCloud.git
-cd MyCloud
-
-# Configurer les secrets
-cp .env.example .env
-nano .env  # Remplir TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, etc.
-
-# Lancer
+docker compose build --no-cache jarvis
 docker compose up -d
-docker compose logs -f jarvis
 ```
 
-### 3. Parler à Jarvis
+## 📱 Utilisation via Telegram
 
-Ouvre Telegram, trouve ton bot, et envoie `/start`.
-
-## Structure du projet
-
-```text
-MyCloud/
-├── docker-compose.yml           # Stack Jarvis (agent + browser + proxy)
-├── docker-compose.projects.yml  # Tes projets perso
-├── Caddyfile                    # Config reverse proxy
-├── .env.example                 # Template variables d'environnement
-├── jarvis/                      # Code source de l'agent
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── src/
-│       ├── main.py              # Point d'entrée
-│       ├── bot.py               # Bot Telegram
-│       ├── agent.py             # Logique agent + tool calling
-│       ├── router.py            # Routeur de modèles (cheap → smart → heavy)
-│       ├── memory.py            # Système de mémoire / apprentissage
-│       └── tools/               # Outils (shell, docker, fichiers, browser)
-├── setup/                       # Scripts d'installation Proxmox/LXC
-│   ├── create-lxc.sh
-│   ├── install-docker.sh
-│   └── README.md
-└── workspace/                   # Dossier partagé pour les projets
-```
-
-## Créer le bot Telegram
-
-1. Parle à [@BotFather](https://t.me/BotFather) sur Telegram
-2. `/newbot` → choisis un nom et un username
-3. Copie le token dans `.env` → `TELEGRAM_BOT_TOKEN`
-4. Parle à [@userinfobot](https://t.me/userinfobot) pour récupérer ton User ID
-5. Ajoute ton ID dans `.env` → `ALLOWED_TELEGRAM_USER_IDS`
-
-## Licence
-
-Projet personnel — usage privé.
+Une fois déployé, contactez votre bot sur Telegram.
+*   `/start` : Initie la conversation (seuls les IDs whitelistés sont autorisés).
+*   `/status` : Affiche l'état du serveur (CPU, RAM, Uptime).
+*   `/backend` : Affiche quel moteur IA (Mac, Gemini ou Toshiba) prend actuellement les commandes.
+*   `/skills` : Affiche tout ce que Jarvis a appris et mémorisé de façon permanente.
