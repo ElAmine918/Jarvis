@@ -75,71 +75,39 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
     messages_dicts = [{"role": msg.role, "content": msg.content} for msg in body.messages]
 
     if body.stream:
-        # Seul Ollama fait du vrai streaming mot à mot (car il n'a pas accès aux outils d'exécution)
-        if body.model == "jarvis-ollama":
-            async def generate_true_stream():
-                try:
-                    chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
-                    async for content in agent.process_message_stream(messages_dicts, body.model):
-                        chunk = {
-                            "id": chunk_id,
-                            "object": "chat.completion.chunk",
-                            "created": int(time.time()),
-                            "model": body.model,
-                            "choices": [{"index": 0, "delta": {"role": "assistant", "content": content}, "finish_reason": None}]
-                        }
-                        yield f"data: {json.dumps(chunk)}\n\n"
-                        
-                    end_chunk = {
-                        "id": chunk_id,
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": body.model,
-                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
-                    }
-                    yield f"data: {json.dumps(end_chunk)}\n\n"
-                    yield "data: [DONE]\n\n"
-                except Exception as e:
-                    logger.error(f"Erreur agent: {e}")
-                    err = {"error": str(e)}
-                    yield f"data: {json.dumps(err)}\n\n"
-                    yield "data: [DONE]\n\n"
-            return StreamingResponse(generate_true_stream(), media_type="text/event-stream")
-        
-        # Pour les vrais agents (Mac, Gemini, Auto) : on exécute d'abord les outils, puis on streame le résultat complet
-        else:
-            async def generate_agent_stream():
-                try:
-                    response_text = await agent.process_message(messages_dicts, body.model)
-                    from .logger_db import log_conversation
-                    last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
-                    log_conversation("open-webui", "local", last_user_msg, response_text, agent.last_backend_used)
-                    
-                    chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
-                    chunk = {
-                        "id": chunk_id,
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": body.model,
-                        "choices": [{"index": 0, "delta": {"role": "assistant", "content": response_text}, "finish_reason": None}]
-                    }
-                    yield f"data: {json.dumps(chunk)}\n\n"
-                    
-                    end_chunk = {
-                        "id": chunk_id,
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": body.model,
-                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
-                    }
-                    yield f"data: {json.dumps(end_chunk)}\n\n"
-                    yield "data: [DONE]\n\n"
-                except Exception as e:
-                    logger.error(f"Erreur agent: {e}")
-                    err = {"error": str(e)}
-                    yield f"data: {json.dumps(err)}\n\n"
-                    yield "data: [DONE]\n\n"
-            return StreamingResponse(generate_agent_stream(), media_type="text/event-stream")
+        async def generate_agent_stream():
+            try:
+                response_text = await agent.process_message(messages_dicts, body.model)
+                from .logger_db import log_conversation
+                last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
+                log_conversation("open-webui", "local", last_user_msg, response_text, agent.last_backend_used)
+                
+                chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
+                chunk = {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": body.model,
+                    "choices": [{"index": 0, "delta": {"role": "assistant", "content": response_text}, "finish_reason": None}]
+                }
+                yield f"data: {json.dumps(chunk)}\n\n"
+                
+                end_chunk = {
+                    "id": chunk_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": body.model,
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
+                }
+                yield f"data: {json.dumps(end_chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                logger.error(f"Erreur agent: {e}")
+                err = {"error": str(e)}
+                yield f"data: {json.dumps(err)}\n\n"
+                yield "data: [DONE]\n\n"
+
+        return StreamingResponse(generate_agent_stream(), media_type="text/event-stream")
 
     try:
         response_text = await agent.process_message(messages_dicts, body.model)

@@ -99,7 +99,7 @@ class JarvisAgent:
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
                 
-                self.last_backend_used = f"{b_name} ({b_model})"
+                self.last_backend_used = f"{b_name} ({model})"
                 return # Succès
             except Exception as e:
                 logger.warning(f"Backend stream {b_name} a échoué: {e}")
