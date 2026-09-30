@@ -32,6 +32,7 @@ Le projet **Jarvis / MyCloud** est un assistant agentique personnel autonome hé
 │  │                                        │
 │  │  [Docker Services]                     │
 │  │  ├─ jarvis (Port 8080)                 │
+│  │  ├─ portainer (Port 9000/9443)         │
 │  │  ├─ chromium (Browserless Headless)    │
 │  │  ├─ ollama (Port 11434, qwen2.5:7b)    │
 │  │  ├─ docker-proxy (Socket sécurisé)     │
@@ -172,6 +173,13 @@ L'utilisateur a remarqué lors des tests que seuls 4 cœurs étaient à 100% dan
   - `jarvis-gemini` : Routage direct vers Google Gemini Flash (`gemini-2.0-flash`).
   - `jarvis-ollama` : Routage direct vers Ollama local Toshiba (`qwen2.5:7b`).
   - `jarvis-mac` : Routage direct vers LM Studio sur le Mac M4 (`qwen/qwen3.5-9b`).
+
+### 6.4. Dashboard Gestionnaire Docker : Portainer CE
+- Accessible sur : **`http://192.168.2.76:9000`** (HTTP) ou **`https://192.168.2.76:9443`** (HTTPS)
+- Également via Tailscale : `http://100.122.16.8:9000`
+- Conteneur : `portainer/portainer-ce:latest` avec volume persistant `portainer-data:/data`
+- Label de sécurité : `jarvis.manageable=false` (protégé contre toute action accidentelle de l'agent)
+- Permet la visualisation en direct de tous les conteneurs, statistiques CPU/RAM par conteneur, logs et inspection des volumes/images.
 
 ---
 
