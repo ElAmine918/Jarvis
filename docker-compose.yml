@@ -180,6 +180,30 @@ services:
         max-size: "5m"
         max-file: "2"
 
+  # ─── Portainer CE (Dashboard Docker Web) ─────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    networks:
+      - jarvis-net
+    labels:
+      - "jarvis.manageable=false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 volumes:
   jarvis-data:
   jarvis-workspace:
@@ -187,6 +211,7 @@ volumes:
   caddy-data:
   caddy-config:
   ollama-data:
+  portainer-data:
 
 networks:
   jarvis-net:
