@@ -61,17 +61,12 @@ class BrowserNavigateTool(Tool):
                 "url_or_search": {
                     "type": "string",
                     "description": "L'URL complète à visiter (ex: https://...) OU des mots-clés de recherche (ex: 'nouvelles canada', 'meteo paris')."
-                },
-                "send_screenshot": {
-                    "type": "boolean",
-                    "description": "Si true, prend une capture d'écran visuelle et l'envoie sur Telegram à l'utilisateur.",
-                    "default": True
                 }
             },
             "required": ["url_or_search"]
         }
 
-    async def execute(self, url_or_search: str, send_screenshot: bool = True, **kwargs) -> str:
+    async def execute(self, url_or_search: str, **kwargs) -> str:
         target = url_or_search.strip()
         
         # Si ce n'est pas une URL, on transforme en recherche Google
@@ -81,17 +76,15 @@ class BrowserNavigateTool(Tool):
         logger.info(f"Navigateur Chromium : navigation vers {target}")
 
         rendered_text = ""
-        screenshot_sent = False
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # 1. Récupération du contenu rendu avec exécution JavaScript
+        async with httpx.AsyncClient(timeout=25.0) as client:
             try:
                 content_payload = {
                     "url": target,
-                    "waitForTimeout": 3000,
+                    "waitForTimeout": 2500,
                     "gotoOptions": {
                         "waitUntil": "domcontentloaded",
-                        "timeout": 20000
+                        "timeout": 15000
                     }
                 }
                 res = await client.post(f"{CHROMIUM_URL}/content", json=content_payload)
@@ -107,36 +100,4 @@ class BrowserNavigateTool(Tool):
                 logger.error(f"Erreur rendu Chromium: {e}")
                 rendered_text = f"Impossible de charger la page : {e}"
 
-            # 2. Capture d'écran et envoi sur Telegram si demandé
-            if send_screenshot and TELEGRAM_BOT_TOKEN and ALLOWED_TELEGRAM_USER_IDS:
-                try:
-                    screen_payload = {
-                        "url": target,
-                        "waitForTimeout": 2500,
-                        "options": {
-                            "type": "jpeg",
-                            "quality": 85,
-                            "fullPage": False
-                        }
-                    }
-                    screen_res = await client.post(f"{CHROMIUM_URL}/screenshot", json=screen_payload)
-                    if screen_res.status_code == 200 and len(screen_res.content) > 1000:
-                        admin_id = ALLOWED_TELEGRAM_USER_IDS[0]
-                        files = {
-                            "photo": ("screenshot.jpg", screen_res.content, "image/jpeg")
-                        }
-                        data = {
-                            "chat_id": admin_id,
-                            "caption": f"📸 Page web consultée :\n{target}"
-                        }
-                        await client.post(
-                            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
-                            data=data,
-                            files=files
-                        )
-                        screenshot_sent = True
-                except Exception as e:
-                    logger.warning(f"Échec envoi screenshot Telegram: {e}")
-
-        status_msg = "📸 [Capture d'écran envoyée sur Telegram]\n\n" if screenshot_sent else ""
-        return f"{status_msg}Contenu visible sur la page ({target}) :\n\n{rendered_text}"
+        return f"Contenu extrait de la page ({target}) :\n\n{rendered_text}"
