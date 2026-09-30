@@ -3,6 +3,7 @@ import logging
 from openai import AsyncOpenAI
 from .config import (
     LM_STUDIO_URL, LM_STUDIO_MODEL, LM_STUDIO_HEALTH_TIMEOUT,
+    OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_MODEL,
     GEMINI_BASE_URL, GEMINI_API_KEY, GEMINI_MODEL,
     OLLAMA_LOCAL_URL, OLLAMA_LOCAL_MODEL
 )
@@ -30,11 +31,15 @@ async def get_all_backends() -> list:
     if await check_endpoint(LM_STUDIO_URL, 4.0):
         backends.append(("LM Studio (Mac)", AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio"), LM_STUDIO_MODEL))
         
-    # 2. Cloud Fallback : Gemini Flash
+    # 2. Cloud Gratuit : OpenRouter (Qwen 3.8 27B)
+    if OPENROUTER_API_KEY:
+        backends.append(("OpenRouter (Cloud)", AsyncOpenAI(base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY), OPENROUTER_MODEL))
+
+    # 3. Cloud Fallback : Gemini Flash
     if GEMINI_API_KEY:
         backends.append(("Gemini Flash (Cloud)", AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY), GEMINI_MODEL))
         
-    # 3. Survie locale : Ollama (Toshiba)
+    # 4. Survie locale : Ollama (Toshiba)
     if await check_endpoint(OLLAMA_LOCAL_URL, 2.0):
         # Vérifie quel modèle est réellement dispo dans Ollama
         chosen_model = OLLAMA_LOCAL_MODEL

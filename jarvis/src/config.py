@@ -15,6 +15,11 @@ LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "local-model")
 # Timeout pour le health check (en secondes) — court pour ne pas bloquer
 LM_STUDIO_HEALTH_TIMEOUT = float(os.getenv("LM_STUDIO_HEALTH_TIMEOUT", "2.0"))
 
+# --- OpenRouter (Cloud gratuit & multi-fournisseurs) ---
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen3.8-27b:free")
+
 # --- Gemini (free tier, fallback quand Mac est éteint) ---
 # Clé API Google AI Studio (gratuit) : https://aistudio.google.com/app/apikey
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

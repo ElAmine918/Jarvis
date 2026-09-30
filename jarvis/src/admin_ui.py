@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 from .logger_db import get_recent_conversations, get_recent_actions
 from .router import check_endpoint
-from .config import LM_STUDIO_URL, OLLAMA_LOCAL_URL, GEMINI_API_KEY, ALLOWED_TELEGRAM_USER_IDS
+from .config import LM_STUDIO_URL, OLLAMA_LOCAL_URL, GEMINI_API_KEY, OPENROUTER_API_KEY, ALLOWED_TELEGRAM_USER_IDS
 
 admin_router = APIRouter()
 
@@ -93,10 +93,16 @@ DASHBOARD_HTML = """
                         <span>Mac (M4 LM Studio)</span>
                     </div>
 
+                    <div :class="backends.openrouter ? 'border-purple-500/30 bg-purple-500/10 text-purple-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'" 
+                         class="flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-medium transition-all">
+                        <span :class="backends.openrouter ? 'bg-purple-400' : 'bg-slate-600'" class="w-2 h-2 rounded-full"></span>
+                        <span>OpenRouter (27B)</span>
+                    </div>
+
                     <div :class="backends.gemini ? 'border-blue-500/30 bg-blue-500/10 text-blue-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'" 
                          class="flex items-center space-x-2 px-3 py-1.5 rounded-lg border font-medium transition-all">
                         <span :class="backends.gemini ? 'bg-blue-400' : 'bg-slate-600'" class="w-2 h-2 rounded-full"></span>
-                        <span>Gemini Flash (Cloud)</span>
+                        <span>Gemini Flash</span>
                     </div>
 
                     <div :class="backends.ollama ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'" 
@@ -307,6 +313,7 @@ DASHBOARD_HTML = """
                     actions: [],
                     backends: {
                         lm_studio: false,
+                        openrouter: false,
                         gemini: false,
                         ollama: false
                     },
@@ -389,6 +396,7 @@ async def admin_api_data():
         "actions": acts,
         "backends": {
             "lm_studio": lm_up,
+            "openrouter": bool(OPENROUTER_API_KEY),
             "gemini": bool(GEMINI_API_KEY),
             "ollama": ollama_up
         },

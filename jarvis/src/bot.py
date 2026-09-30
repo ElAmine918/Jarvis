@@ -8,6 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from .config import (
     TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS, 
     LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT,
+    OPENROUTER_API_KEY, OPENROUTER_MODEL,
     OLLAMA_LOCAL_URL, OLLAMA_LOCAL_MODEL,
     GEMINI_API_KEY
 )
@@ -113,15 +114,18 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Statuts détaillés
     t1_status = "🟢 En ligne (`qwen/qwen3.5-9b`)" if lm_up else "🔴 Inaccessible (Mac éteint ou hors Tailscale)"
-    t2_status = "🟢 Configuré (Clé API active)" if GEMINI_API_KEY else "⚪️ Non configuré"
-    t3_status = f"🟢 En ligne (`{OLLAMA_LOCAL_MODEL}` - 8 cœurs)" if ollama_up else "🔴 Inaccessible"
+    t2_status = f"🟢 Actif (`{OPENROUTER_MODEL}`)" if OPENROUTER_API_KEY else "⚪️ Non configuré"
+    t3_status = "🟢 Configuré (Clé API active)" if GEMINI_API_KEY else "⚪️ Non configuré"
+    t4_status = f"🟢 En ligne (`{OLLAMA_LOCAL_MODEL}` - 8 cœurs)" if ollama_up else "🔴 Inaccessible"
 
     if lm_up:
         lead = "🍏 *Tier 1 : Mac M4 (LM Studio)* prend la priorité."
+    elif OPENROUTER_API_KEY:
+        lead = f"🌐 *Tier 2 : OpenRouter ({OPENROUTER_MODEL})* prend le relais (Mac hors-ligne)."
     elif GEMINI_API_KEY:
-        lead = "☁️ *Tier 2 : Gemini Flash (Cloud)* prend le relais (Mac hors-ligne)."
+        lead = "☁️ *Tier 3 : Gemini Flash (Cloud)* prend le relais."
     elif ollama_up:
-        lead = "🦙 *Tier 3 : Toshiba (Ollama)* actif en survie locale autonome."
+        lead = "🦙 *Tier 4 : Toshiba (Ollama)* actif en survie locale autonome."
     else:
         lead = "❌ Aucun backend ne répond actuellement."
 
@@ -130,10 +134,12 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━━\n"
         f"1️⃣ *Tier 1 (Performance - Mac M4)* :\n"
         f"   └ {t1_status}\n\n"
-        f"2️⃣ *Tier 2 (Cloud Fallback - Google)* :\n"
+        f"2️⃣ *Tier 2 (Cloud Gratuit - OpenRouter)* :\n"
         f"   └ {t2_status}\n\n"
-        f"3️⃣ *Tier 3 (Survie Locale - Toshiba)* :\n"
-        f"   └ {t3_status}\n"
+        f"3️⃣ *Tier 3 (Cloud Fallback - Google Gemini)* :\n"
+        f"   └ {t3_status}\n\n"
+        f"4️⃣ *Tier 4 (Survie Locale - Toshiba Ollama)* :\n"
+        f"   └ {t4_status}\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
         f"👉 *Priorité actuelle* :\n{lead}\n\n"
         f"ℹ️ *Dernier modèle utilisé* :\n`{agent.last_backend_used}`"
