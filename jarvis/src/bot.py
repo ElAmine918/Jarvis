@@ -228,15 +228,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
+        import time
         response = ""
+        # Send initial placeholder
+        msg = await update.message.reply_text("⏳ *Jarvis initialise le traitement...*", parse_mode=ParseMode.MARKDOWN)
+        last_edit_time = time.time()
+        
         async for chunk in agent.process_message(history):
             response += chunk
+            current_time = time.time()
+            # Update Telegram UI every 1.5 seconds to simulate streaming
+            if current_time - last_edit_time > 1.5 and len(response) > 0 and len(response) < 4000:
+                try:
+                    # Append a cursor for the hacker feel.
+                    await msg.edit_text(response + " █", parse_mode=ParseMode.MARKDOWN)
+                    last_edit_time = current_time
+                except Exception:
+                    pass # Ignore Markdown partial parsing errors or unchanged content
+                    
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation
         log_conversation("telegram", str(user_id), user_text, response, agent.last_backend_used)
         
-        await _send_long(update, response)
+        # Final update (without cursor) or split if too long
+        try:
+            if len(response) < 4000:
+                await msg.edit_text(response, parse_mode=ParseMode.MARKDOWN)
+            else:
+                await msg.delete()
+                await _send_long(update, response)
+        except Exception:
+            pass
+            
     except Exception as e:
         logger.error(f"Erreur traitement message: {e}")
         history.pop()  # Retirer le message utilisateur qui a échoué
