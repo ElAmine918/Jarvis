@@ -1,0 +1,77 @@
+"""
+Point d'entrée de Jarvis.
+Lance en parallèle :
+  - Le bot Telegram (polling)
+  - Le serveur FastAPI (pour Open WebUI)
+"""
+import asyncio
+import logging
+import sys
+import uvicorn
+
+from .config import LOG_LEVEL, API_HOST, API_PORT, TELEGRAM_BOT_TOKEN
+from .agent import JarvisAgent
+from .bot import build_app as build_telegram_app
+from .api import app as fastapi_app
+
+# Configuration du logging
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
+
+async def run_telegram(agent: JarvisAgent):
+    """Lance le bot Telegram en polling."""
+    if not TELEGRAM_BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN non défini — bot Telegram désactivé.")
+        return
+
+    app = build_telegram_app(agent)
+    await app.initialize()
+    await app.start()
+    logger.info("✅ Bot Telegram démarré")
+    await app.updater.start_polling(drop_pending_updates=True)
+
+    # Maintenir le bot en vie jusqu'à l'arrêt
+    stop_event = asyncio.Event()
+    await stop_event.wait()
+
+
+async def run_api(agent: JarvisAgent):
+    """Lance le serveur FastAPI (pour Open WebUI)."""
+    fastapi_app.state.agent = agent
+    config = uvicorn.Config(
+        app=fastapi_app,
+        host=API_HOST,
+        port=API_PORT,
+        log_level=LOG_LEVEL.lower(),
+        access_log=False,
+    )
+    server = uvicorn.Server(config)
+    logger.info(f"✅ API Jarvis démarrée sur http://{API_HOST}:{API_PORT}")
+    await server.serve()
+
+
+async def main():
+    logger.info("🚀 Démarrage de Jarvis...")
+
+    # Créer et initialiser l'agent (partagé entre Telegram et l'API)
+    agent = JarvisAgent()
+    await agent.init()
+    logger.info("✅ Agent initialisé (mémoire SQLite prête)")
+
+    # Lancer Telegram et l'API en parallèle
+    await asyncio.gather(
+        run_telegram(agent),
+        run_api(agent),
+    )
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Arrêt de Jarvis.")
