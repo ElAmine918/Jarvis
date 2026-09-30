@@ -234,7 +234,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_text("⏳ *Jarvis initialise le traitement...*", parse_mode=ParseMode.MARKDOWN)
         last_edit_time = time.time()
         
-        async for chunk in agent.process_message(history):
+        async for chunk in agent.process_message(history, str(user_id)):
             response += chunk
             current_time = time.time()
             # Update Telegram UI every 1.5 seconds to simulate streaming
@@ -249,17 +249,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation
-        log_conversation("telegram", str(user_id), user_text, response, agent.last_backend_used)
+        log_conversation(str(user_id), "telegram", str(user_id), user_text, response, getattr(agent, 'last_backend_used', 'unknown'))
         
         # Final update (without cursor) or split if too long
         try:
             if len(response) < 4000:
-                await msg.edit_text(response, parse_mode=ParseMode.MARKDOWN)
+                try:
+                    await msg.edit_text(response, parse_mode=ParseMode.MARKDOWN)
+                except Exception:
+                    await msg.edit_text(response) # fallback without markdown
             else:
                 await msg.delete()
                 await _send_long(update, response)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to edit final message: {e}")
             
     except Exception as e:
         logger.error(f"Erreur traitement message: {e}")

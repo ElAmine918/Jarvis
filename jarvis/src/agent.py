@@ -82,7 +82,7 @@ class JarvisAgent:
         return history
 
 
-    async def process_message(self, open_webui_messages: List[Dict[str, Any]], requested_model: str = "jarvis-auto") -> AsyncGenerator[str, None]:
+    async def process_message(self, open_webui_messages: List[Dict[str, Any]], session_id: str = 'default', requested_model: str = "jarvis-auto") -> AsyncGenerator[str, None]:
         backends = await self._get_backends_for_model(requested_model)
         if not backends:
             yield f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
@@ -198,7 +198,7 @@ class JarvisAgent:
                     from .logger_db import log_action
                     logger.info(f"Tool call: {tool_name}({tool_args})")
                     result = await self.tool_registry.execute_tool(tool_name, tool_args)
-                    log_action("N/A", tool_name, tool_args, result)
+                    log_action(session_id, tool_name, tool_args, result, getattr(self, 'last_backend_used', 'unknown'))
                     
                     history.append({
                         "role": "tool",
