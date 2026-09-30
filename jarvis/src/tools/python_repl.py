@@ -57,20 +57,14 @@ class PythonREPLTool(Tool):
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15.0)
                 output = ""
                 if stdout:
-                    output += f"--- STDOUT ---
-{stdout.decode('utf-8')}
-"
+                    output += f"--- STDOUT ---\n{stdout.decode('utf-8')}\n"
                 if stderr:
-                    output += f"--- STDERR ---
-{stderr.decode('utf-8')}
-"
+                    output += f"--- STDERR ---\n{stderr.decode('utf-8')}\n"
                 
                 if proc.returncode == 0:
-                    return f"✅ Exécution réussie.
-{output}"
+                    return f"✅ Exécution réussie.\n{output}"
                 else:
-                    return f"❌ Erreur d'exécution (Code {proc.returncode}).
-{output}"
+                    return f"❌ Erreur d'exécution (Code {proc.returncode}).\n{output}"
             except asyncio.TimeoutError:
                 proc.kill()
                 return "❌ Erreur : Le script a dépassé le temps limite de 15 secondes (boucle infinie ?)."
