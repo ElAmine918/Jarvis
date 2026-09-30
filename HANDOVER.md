@@ -168,7 +168,7 @@ L'utilisateur a remarqué lors des tests que seuls 4 cœurs étaient à 100% dan
 - Endpoint OpenAI : `http://jarvis:8080/v1`
 - Modèles disponibles dans le sélecteur d'Open WebUI (`/v1/models`) :
   - `jarvis-auto` : Cascade complète et dynamique (Tier 1 -> Tier 2 -> Tier 3 -> Tier 4).
-  - `jarvis-openrouter` (alias `jarvis-omniroute`) : Routage direct vers le backend OpenRouter Cloud (`qwen/qwen3.8-27b:free`).
+  - `jarvis-openrouter` : Routage direct vers le backend OpenRouter Cloud (`qwen/qwen3.8-27b:free`).
   - `jarvis-gemini` : Routage direct vers Google Gemini Flash (`gemini-2.0-flash`).
   - `jarvis-ollama` : Routage direct vers Ollama local Toshiba (`qwen2.5:7b`).
   - `jarvis-mac` : Routage direct vers LM Studio sur le Mac M4 (`qwen/qwen3.5-9b`).

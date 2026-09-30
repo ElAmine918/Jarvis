@@ -60,7 +60,6 @@ async def list_models():
         "data": [
             ModelInfo(id="jarvis-auto", created=int(time.time())),
             ModelInfo(id="jarvis-openrouter", created=int(time.time())),
-            ModelInfo(id="jarvis-omniroute", created=int(time.time())),
             ModelInfo(id="jarvis-gemini", created=int(time.time())),
             ModelInfo(id="jarvis-ollama", created=int(time.time())),
             ModelInfo(id="jarvis-mac", created=int(time.time()))

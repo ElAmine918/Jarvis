@@ -59,7 +59,7 @@ class JarvisAgent:
             return [b for b in all_backends if "Ollama" in b[0]]
         elif requested_model == "jarvis-mac":
             return [b for b in all_backends if "LM Studio" in b[0]]
-        elif requested_model in ("jarvis-openrouter", "jarvis-omniroute"):
+        elif requested_model == "jarvis-openrouter":
             return [b for b in all_backends if "OpenRouter" in b[0]]
         return all_backends
 
