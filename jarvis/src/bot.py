@@ -50,13 +50,46 @@ async def _send_long(update: Update, text: str):
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
-    await update.message.reply_text(
-        "👋 Salut, je suis Jarvis.\n"
-        "Je tourne sur ton serveur Proxmox et je peux exécuter des commandes, "
-        "gérer tes containers Docker, et lire sur le web.\n\n"
-        "Commandes disponibles : /status /backend /skills\n"
-        "Sinon, parle-moi directement."
+    msg = (
+        "👋 *Bienvenue sur Jarvis OS v5.2*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "Je suis ton assistant personnel et opérateur d'infrastructure autonome.\n\n"
+        "🛠 *Mes Capacités Clés* :\n"
+        "• 🌐 *Navigation Web* : J'ouvre des sites en direct via Chromium et j'en extrais le contenu.\n"
+        "• 🐳 *Gestion Docker* : Supervision et contrôle de tes conteneurs avec sécurité renforcée.\n"
+        "• 🔐 *Human-in-the-Loop* : Pour les actions critiques, je t'envoie des boutons d'approbation ici.\n"
+        "• 🧠 *Apprentissage Continu* : Mémorisation de tes préférences et compétences.\n\n"
+        "📋 *Commandes Disponibles* :\n"
+        "/status — 📊 Rapport complet (CPU, RAM, Disque, Moteur actif)\n"
+        "/backend — 🤖 État des 4 tiers d'IA et cascade de secours\n"
+        "/skills — 🧠 Consulter les connaissances apprises\n"
+        "/help — 💡 Guide rapide d'utilisation\n\n"
+        "Tu peux aussi me parler naturellement à tout moment !"
     )
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+    msg = (
+        "💡 *GUIDE D'UTILISATION JARVIS*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "Voici quelques exemples de ce que tu peux me demander :\n\n"
+        "🌐 *Recherche & Navigation Web* :\n"
+        "• _« Quelles sont les dernières actus tech aujourd'hui ? »_\n"
+        "• _« Va sur https://news.ycombinator.com et résume le premier article »_\n"
+        "• _« Quelle est la météo à Montréal cette semaine ? »_\n\n"
+        "🐳 *Conteneurs Docker & Infrastructure* :\n"
+        "• _« Liste les conteneurs en cours d'exécution »_\n"
+        "• _« Redémarre le conteneur caddy »_\n"
+        "• _« Donne-moi l'utilisation des ressources du serveur »_\n\n"
+        "📊 *Commandes Rapides* :\n"
+        "• `/status` : Bilan instantané des ressources matérielles.\n"
+        "• `/backend` : Voir si c'est ton Mac M4, OpenRouter, Gemini ou le Toshiba qui répond.\n"
+        "• `/skills` : Afficher la mémoire à long terme."
+    )
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -210,10 +243,25 @@ def build_app(agent: JarvisAgent) -> Application:
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN manquant dans .env")
 
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    from telegram import BotCommand
+
+    async def post_init(application: Application):
+        commands = [
+            BotCommand("status", "📊 Rapport système (CPU, RAM, Disque, Moteur)"),
+            BotCommand("backend", "🤖 État des moteurs IA & cascade"),
+            BotCommand("skills", "🧠 Compétences et mémoire"),
+            BotCommand("help", "💡 Guide et exemples d'utilisation")
+        ]
+        try:
+            await application.bot.set_my_commands(commands)
+        except Exception as e:
+            logger.warning(f"Impossible d'enregistrer les commandes Telegram: {e}")
+
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     app.bot_data["agent"] = agent
 
     app.add_handler(CommandHandler("start", cmd_start, block=False))
+    app.add_handler(CommandHandler("help", cmd_help, block=False))
     app.add_handler(CommandHandler("status", cmd_status, block=False))
     app.add_handler(CommandHandler("backend", cmd_backend, block=False))
     app.add_handler(CommandHandler("skills", cmd_skills, block=False))
