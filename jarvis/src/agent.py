@@ -59,6 +59,8 @@ class JarvisAgent:
             return [b for b in all_backends if "Ollama" in b[0]]
         elif requested_model == "jarvis-mac":
             return [b for b in all_backends if "LM Studio" in b[0]]
+        elif requested_model in ("jarvis-openrouter", "jarvis-omniroute"):
+            return [b for b in all_backends if "OpenRouter" in b[0]]
         return all_backends
 
     def _prepare_history(self, open_webui_messages: List[Dict[str, str]]) -> List[Dict[str, Any]]:

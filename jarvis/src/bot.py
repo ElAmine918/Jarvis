@@ -115,6 +115,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if lm_up:
         active_engine = "🍏 Mac M4 (LM Studio - Qwen 3.5 9B)"
+    elif bool(OPENROUTER_API_KEY):
+        active_engine = f"🌐 OpenRouter ({OPENROUTER_MODEL})"
     elif bool(GEMINI_API_KEY):
         active_engine = "☁️ Gemini Flash (Google Cloud)"
     elif ollama_up:
