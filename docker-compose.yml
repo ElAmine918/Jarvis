@@ -60,6 +60,7 @@ services:
     volumes:
       - jarvis-data:/app/data
       - jarvis-workspace:/app/workspace
+      - ./jarvis/src:/app/src:ro
       # PAS de /var/run/docker.sock ici — c'est le proxy qui gère
     networks:
       - jarvis-net
