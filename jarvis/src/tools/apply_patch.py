@@ -38,22 +38,28 @@ class ApplyPatchTool(Tool):
         }
 
     async def execute(self, **kwargs) -> str:
+        from .filesystem import _safe_path
+        
         file_path = kwargs.get("file_path")
         search_text = kwargs.get("search_text")
         replace_text = kwargs.get("replace_text")
         
+        safe = _safe_path(file_path)
+        if safe is None:
+            return f"🚫 Sécurité: Le chemin '{file_path}' est interdit. Vous ne pouvez patcher que des fichiers dans /app/workspace."
+            
         try:
-            with open(file_path, "r") as f:
+            with open(safe, "r") as f:
                 content = f.read()
                 
             if search_text not in content:
-                return f"Erreur : Le texte de recherche exact n'a pas été trouvé dans {file_path}."
+                return f"Erreur : Le texte de recherche exact n'a pas été trouvé dans {safe.name}."
                 
             new_content = content.replace(search_text, replace_text, 1)
             
-            with open(file_path, "w") as f:
+            with open(safe, "w") as f:
                 f.write(new_content)
                 
-            return f"✅ Fichier {file_path} patché avec succès."
+            return f"✅ Fichier {safe.name} patché avec succès."
         except Exception as e:
-            return f"Erreur lors du patch de {file_path} : {str(e)}"
+            return f"Erreur lors du patch de {safe.name} : {str(e)}"

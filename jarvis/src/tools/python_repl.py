@@ -32,11 +32,10 @@ class PythonREPLTool(Tool):
         }
 
     async def execute(self, **kwargs) -> str:
-        code = kwargs.get("code")
-        
-        # Write code to a temp file in /app/workspace
         import os
         import uuid
+        
+        code = kwargs.get("code")
         script_name = f"script_{uuid.uuid4().hex[:8]}.py"
         script_path = os.path.join("/app/workspace", script_name)
         
@@ -44,35 +43,54 @@ class PythonREPLTool(Tool):
             with open(script_path, "w") as f:
                 f.write(code)
                 
-            # Run the script using Python inside the workspace
-            # We use asyncio.create_subprocess_exec
-            # SECURITY FIX: Strip environment variables to prevent API key leakage
+            # SECURITY FIX: Bubblewrap (bwrap) isolation
+            # Only /app/workspace is mounted rw. /app/src is NOT mounted! 
+            # No network, completely isolated process tree.
+            bwrap_cmd = [
+                "bwrap",
+                "--ro-bind", "/usr", "/usr",
+                "--ro-bind", "/bin", "/bin",
+                "--ro-bind", "/lib", "/lib",
+                "--ro-bind", "/lib64", "/lib64",
+                "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
+                "--bind", "/app/workspace", "/app/workspace",
+                "--unshare-all", # Drop all namespaces (network, ipc, pid)
+                "--die-with-parent",
+                "python3", script_path
+            ]
+            
             proc = await asyncio.create_subprocess_exec(
-                "python3", script_path,
+                *bwrap_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd="/app/workspace",
-                env={"PYTHONPATH": "/app/workspace"} # No access to TELEGRAM_BOT_TOKEN or GEMINI_API_KEY
+                env={} # No env vars (API keys)
             )
             
-            # Timeout after 15 seconds to prevent infinite loops
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15.0)
                 output = ""
                 if stdout:
-                    output += f"--- STDOUT ---\n{stdout.decode('utf-8')}\n"
+                    output += f"--- STDOUT ---
+{stdout.decode('utf-8')}
+"
                 if stderr:
-                    output += f"--- STDERR ---\n{stderr.decode('utf-8')}\n"
+                    output += f"--- STDERR ---
+{stderr.decode('utf-8')}
+"
                 
                 if proc.returncode == 0:
-                    return f"✅ Exécution réussie.\n{output}"
+                    return f"✅ Exécution réussie (Bac à sable bwrap).
+{output}"
                 else:
-                    return f"❌ Erreur d'exécution (Code {proc.returncode}).\n{output}"
+                    return f"❌ Erreur d'exécution (Code {proc.returncode}).
+{output}"
             except asyncio.TimeoutError:
                 proc.kill()
                 return "❌ Erreur : Le script a dépassé le temps limite de 15 secondes (boucle infinie ?)."
                 
         except Exception as e:
+            # Fallback if bwrap is missing/blocked
             return f"❌ Erreur système lors de l'exécution: {str(e)}"
         finally:
             if os.path.exists(script_path):

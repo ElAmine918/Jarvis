@@ -24,6 +24,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     git \
+    bubblewrap \
     iproute2 \
     ca-certificates \
     gnupg \

@@ -36,14 +36,19 @@ class GitTool(Tool):
         }
 
     async def execute(self, **kwargs) -> str:
-        command = kwargs.get("command")
-        working_dir = kwargs.get("working_dir", "/app")
-        
+        from .filesystem import _safe_path
         import shlex
+        
+        command = kwargs.get("command")
+        working_dir = kwargs.get("working_dir", "/app/workspace")
+        
+        safe_dir = _safe_path(working_dir)
+        if safe_dir is None or not safe_dir.is_dir():
+            return f"🚫 Sécurité: Le dossier '{working_dir}' est interdit ou invalide. Opérations Git limitées à /app/workspace."
+        
         if not command.startswith("git "):
             return "❌ Erreur : La commande doit commencer par 'git '."
             
-        # SECURITY FIX: Parse safely to avoid shell injection (e.g. 'git status ; rm -rf /')
         try:
             args = shlex.split(command)
         except ValueError as e:
@@ -57,7 +62,7 @@ class GitTool(Tool):
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir
+                cwd=str(safe_dir)
             )
             stdout, stderr = await proc.communicate()
             
@@ -65,7 +70,8 @@ class GitTool(Tool):
             if stdout:
                 output += stdout.decode('utf-8')
             if stderr:
-                output += "\n(Stderr): " + stderr.decode('utf-8')
+                output += "
+(Stderr): " + stderr.decode('utf-8')
                 
             return output if output else "✅ Commande exécutée avec succès (sans sortie)."
         except Exception as e:

@@ -3,6 +3,7 @@ from typing import List
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "jarvis")
 ALLOWED_TELEGRAM_USER_IDS: List[int] = [
     int(uid.strip()) for uid in os.getenv("ALLOWED_TELEGRAM_USER_IDS", "").split(",") if uid.strip()
 ]

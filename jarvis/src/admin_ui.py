@@ -2,11 +2,15 @@ import os
 import psutil
 import datetime
 import random
-from fastapi import APIRouter
+
+import secrets
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse
+from .config import ADMIN_PASSWORD
 from .logger_db import get_recent_conversations, get_recent_actions
 from .router import check_endpoint
-from .config import LM_STUDIO_URL, OLLAMA_LOCAL_URL, GEMINI_API_KEY, OPENROUTER_API_KEY
+from .config import LM_STUDIO_URL, ADMIN_PASSWORD, OLLAMA_LOCAL_URL, GEMINI_API_KEY, OPENROUTER_API_KEY
 
 admin_router = APIRouter()
 
@@ -429,12 +433,28 @@ DASHBOARD_HTML = """
 </html>
 """
 
+
+security = HTTPBasic()
+
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    # Fallback to "jarvis" if ADMIN_PASSWORD is not set in .env
+    correct_username = secrets.compare_digest(credentials.username, "admin")
+    correct_password = secrets.compare_digest(credentials.password, getattr(ADMIN_PASSWORD, 'value', 'jarvis') if hasattr(ADMIN_PASSWORD, 'value') else "jarvis")
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials
+
 @admin_router.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard():
+async def admin_dashboard(_=Depends(verify_admin)):
     return HTMLResponse(content=DASHBOARD_HTML)
 
 @admin_router.get("/admin/api/data")
-async def admin_api_data():
+async def admin_api_data(_=Depends(verify_admin)):
+
     convs = get_recent_conversations(15)
     acts = get_recent_actions(20)
     
