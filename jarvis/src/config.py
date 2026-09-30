@@ -1,9 +1,18 @@
 import os
+import sys
 from typing import List
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "jarvis")
+# H-08 : Pas de mot de passe par défaut — forcer la configuration explicite
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+if not ADMIN_PASSWORD:
+    # Log un warning sévère mais ne bloque pas le démarrage (compatibilité)
+    import logging as _logging
+    _logging.getLogger(__name__).critical(
+        "ADMIN_PASSWORD non défini dans .env — le dashboard admin est DÉSACTIVÉ. "
+        "Définissez ADMIN_PASSWORD dans votre .env pour accéder au dashboard."
+    )
 ALLOWED_TELEGRAM_USER_IDS: List[int] = [
     int(uid.strip()) for uid in os.getenv("ALLOWED_TELEGRAM_USER_IDS", "").split(",") if uid.strip()
 ]

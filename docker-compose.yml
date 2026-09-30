@@ -89,10 +89,10 @@ services:
     restart: unless-stopped
     environment:
       OPENAI_API_BASE_URL: "http://jarvis:8080/v1"
-      OPENAI_API_KEY: "jarvis-local"
+      OPENAI_API_KEY: "${JARVIS_API_KEY}"  # H-06 : utiliser la même clé API Jarvis
       ENABLE_OLLAMA_API: "false"
-      WEBUI_SECRET_KEY: "jarvis-secret-change-me"
-      WEBUI_AUTH: "false"
+      WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY}"  # H-06 : clé secrète depuis .env (plus de valeur en dur)
+      WEBUI_AUTH: "true"  # H-06 : activer l'authentification Open WebUI
     ports:
       - "3000:8080"
     volumes:
@@ -188,7 +188,7 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "9000:9000"
+      # H-09 : uniquement HTTPS — le port HTTP 9000 est retiré pour éviter le trafic en clair
       - "9443:9443"
     volumes:
       - /etc/localtime:/etc/localtime:ro

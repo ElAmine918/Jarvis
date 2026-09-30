@@ -18,6 +18,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+# C-03 : Explicitement les .env des sous-dossiers (ne pas se fier uniquement au pattern racine)
+jarvis/.env
+jarvis/.env.*
 *.pem
 *.key
 *.pfx

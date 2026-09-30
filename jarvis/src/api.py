@@ -1,10 +1,13 @@
+import os
 import time
 import uuid
 import logging
 import json
-from fastapi import FastAPI, HTTPException, Request
+import secrets
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -16,13 +19,44 @@ app = FastAPI(title="Jarvis API", version="1.0.0")
 
 app.include_router(admin_router)
 
+# --- CORS : restreindre aux origines internes connues (M-05) ---
+_CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if not _CORS_ORIGINS:
+    # Fallback : uniquement le réseau interne Docker (open-webui → jarvis)
+    _CORS_ORIGINS = ["http://open-webui:8080", "http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+# --- Authentification API (C-02) ---
+_API_KEY = os.getenv("JARVIS_API_KEY", "")
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+async def _verify_api_key(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> None:
+    """Vérifie la clé API Bearer sur tous les endpoints /v1/*."""
+    if not _API_KEY:
+        # Clé non configurée → on logue un avertissement mais on bloque quand même
+        logger.critical(
+            "JARVIS_API_KEY non défini — l'API /v1/* est NON-AUTHENTIFIÉE ! "
+            "Définissez JARVIS_API_KEY dans votre .env immédiatement."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="API non disponible : JARVIS_API_KEY manquant dans la configuration.",
+        )
+    if credentials is None or not secrets.compare_digest(
+        credentials.credentials.encode(), _API_KEY.encode()
+    ):
+        logger.warning(f"Tentative d'accès API non-autorisée depuis {request.client.host}")
+        raise HTTPException(status_code=401, detail="Clé API invalide ou manquante.")
 
 class ChatMessage(BaseModel):
     role: str
@@ -53,7 +87,7 @@ class ModelInfo(BaseModel):
     created: int = 0
     owned_by: str = "jarvis"
 
-@app.get("/v1/models")
+@app.get("/v1/models", dependencies=[Depends(_verify_api_key)])
 async def list_models():
     return {
         "object": "list",
@@ -66,7 +100,7 @@ async def list_models():
         ]
     }
 
-@app.post("/v1/chat/completions")
+@app.post("/v1/chat/completions", dependencies=[Depends(_verify_api_key)])
 async def chat_completions(request: Request, body: ChatCompletionRequest):
     agent = app.state.agent
 
@@ -94,7 +128,8 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 
                 from .logger_db import log_conversation
                 last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
-                log_conversation("open-webui", "local", last_user_msg, full_response, agent.last_backend_used)
+                # H-12 : correction signature — session_id ajouté (6 args)
+                log_conversation("open-webui", "open-webui", "api", last_user_msg, full_response, agent.last_backend_used)
                 
                 end_chunk = {
                     "id": chunk_id,
@@ -106,8 +141,9 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 yield f"data: {json.dumps(end_chunk)}\n\n"
                 yield "data: [DONE]\n\n"
             except Exception as e:
-                logger.error(f"Erreur agent: {e}")
-                err = {"error": str(e)}
+                logger.error(f"Erreur agent stream: {e}", exc_info=True)
+                # M-03 : masquer les détails d'erreur dans le stream SSE
+                err = {"error": {"message": "Erreur interne du serveur.", "type": "server_error"}}
                 yield f"data: {json.dumps(err)}\n\n"
                 yield "data: [DONE]\n\n"
         return StreamingResponse(generate_agent_stream(), media_type="text/event-stream")
@@ -119,10 +155,12 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
             
         from .logger_db import log_conversation
         last_user_msg = next((m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), "")
-        log_conversation("open-webui", "local", last_user_msg, response_text, agent.last_backend_used)
+        # H-12 : correction signature — session_id ajouté (6 args)
+        log_conversation("open-webui", "open-webui", "api", last_user_msg, response_text, agent.last_backend_used)
     except Exception as e:
-        logger.error(f"Erreur agent: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Erreur agent: {e}", exc_info=True)
+        # M-02 : ne pas exposer les détails d'erreur internes
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
     return ChatCompletionResponse(
         id=f"jarvis-{uuid.uuid4().hex[:8]}",

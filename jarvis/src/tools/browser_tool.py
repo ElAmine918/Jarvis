@@ -7,6 +7,7 @@ from urllib.parse import urlparse, quote
 import httpx
 
 from .base import Tool
+from .web_reader import _is_safe_url
 from ..config import TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,11 @@ class BrowserNavigateTool(Tool):
         if not target.startswith("http://") and not target.startswith("https://"):
             target = f"https://www.google.com/search?q={quote(target)}&hl=fr"
 
+        # C-04 : Validation SSRF — même protection que web_reader.py
+        if not _is_safe_url(target):
+            logger.warning(f"Tentative SSRF bloquée dans browse_internet vers {target}")
+            return "🚫 URL bloquée. Les adresses IP locales, privées, Tailscale et les schémas non-HTTPS sont interdits."
+
         logger.info(f"Navigateur Chromium : navigation vers {target}")
 
         rendered_text = ""
@@ -101,3 +107,4 @@ class BrowserNavigateTool(Tool):
                 rendered_text = f"Impossible de charger la page : {e}"
 
         return f"Contenu extrait de la page ({target}) :\n\n{rendered_text}"
+

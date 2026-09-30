@@ -58,10 +58,21 @@ class SchedulerTool(Tool):
     async def execute(self, **kwargs) -> str:
         delay_minutes = kwargs.get("delay_minutes", 1)
         message = kwargs.get("message")
-        
-        delay_seconds = int(delay_minutes * 60)
-        
-        # Lance la tâche en arrière-plan (Fire and forget)
-        asyncio.create_task(_send_telegram_reminder(message, delay_seconds))
+
+        # M-13 : Valider le délai — min 1 min, max 24h (1440 min)
+        delay_minutes = max(1, min(int(delay_minutes), 1440))
+        delay_seconds = delay_minutes * 60
+
+        # M-11 : Limiter le nombre de rappels actifs simultanés
+        _MAX_PENDING = 10
+        active_tasks = [t for t in asyncio.all_tasks() if "reminder" in t.get_name()]
+        if len(active_tasks) >= _MAX_PENDING:
+            return f"❌ Limite atteinte : {_MAX_PENDING} rappels sont déjà en attente. Attends qu'ils s'exécutent avant d'en programmer d'autres."
+
+        task = asyncio.create_task(
+            _send_telegram_reminder(message, delay_seconds),
+            name=f"reminder_{delay_minutes}m",
+        )
         
         return f"✅ Rappel programmé avec succès. Le message sera envoyé dans {delay_minutes} minute(s)."
+

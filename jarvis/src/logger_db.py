@@ -13,6 +13,7 @@ def init_db():
     conn.execute('''
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
             source TEXT NOT NULL,
             user_id TEXT,
             message_in TEXT NOT NULL,
@@ -25,32 +26,57 @@ def init_db():
         CREATE TABLE IF NOT EXISTS actions (
             id TEXT PRIMARY KEY,
             conversation_id TEXT,
+            session_id TEXT,
             tool_name TEXT NOT NULL,
             arguments TEXT,
             result TEXT,
+            model_used TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS token_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            model_name TEXT NOT NULL,
+            tokens INTEGER NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Migrations if tables already exist but missing columns
+    try: conn.execute("ALTER TABLE conversations ADD COLUMN session_id TEXT DEFAULT 'default'")
+    except: pass
+    try: conn.execute("ALTER TABLE actions ADD COLUMN session_id TEXT DEFAULT 'default'")
+    except: pass
+    try: conn.execute("ALTER TABLE actions ADD COLUMN model_used TEXT DEFAULT 'unknown'")
+    except: pass
+    
     conn.commit()
     conn.close()
 
-def log_conversation(source: str, user_id: str, message_in: str, message_out: str, model_used: str = "") -> str:
+def log_conversation(session_id: str, source: str, user_id: str, message_in: str, message_out: str, model_used: str = "") -> str:
     conv_id = str(uuid.uuid4())
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO conversations (id, source, user_id, message_in, message_out, model_used) VALUES (?, ?, ?, ?, ?, ?)",
-        (conv_id, source, user_id, message_in, message_out, model_used)
+        "INSERT INTO conversations (id, session_id, source, user_id, message_in, message_out, model_used) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (conv_id, session_id, source, user_id, message_in, message_out, model_used)
     )
     conn.commit()
     conn.close()
     return conv_id
 
-def log_action(conversation_id: str, tool_name: str, arguments: Dict[str, Any], result: str):
+def log_action(session_id: str, tool_name: str, arguments: Dict[str, Any], result: str, model_used: str = "unknown"):
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO actions (id, conversation_id, tool_name, arguments, result) VALUES (?, ?, ?, ?, ?)",
-        (str(uuid.uuid4()), conversation_id, tool_name, json.dumps(arguments), result)
+        "INSERT INTO actions (id, session_id, tool_name, arguments, result, model_used) VALUES (?, ?, ?, ?, ?, ?)",
+        (str(uuid.uuid4()), session_id, tool_name, json.dumps(arguments), result, model_used)
     )
+    conn.commit()
+    conn.close()
+    
+def log_token_usage(model_name: str, tokens: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("INSERT INTO token_usage (model_name, tokens) VALUES (?, ?)", (model_name, tokens))
     conn.commit()
     conn.close()
 
@@ -67,3 +93,26 @@ def get_recent_actions(limit: int = 50) -> List[Dict[str, Any]]:
     rows = conn.execute("SELECT * FROM actions ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_token_stats() -> Dict[str, int]:
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute("SELECT model_name, SUM(tokens) as total FROM token_usage GROUP BY model_name").fetchall()
+    conn.close()
+    return {row[0]: row[1] for row in rows}
+
+def get_conversations_by_session(limit_sessions: int = 10) -> Dict[str, List[Dict[str, Any]]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    
+    # Get most recent sessions
+    sessions = conn.execute("SELECT DISTINCT session_id, MAX(timestamp) as last_activity FROM conversations GROUP BY session_id ORDER BY last_activity DESC LIMIT ?", (limit_sessions,)).fetchall()
+    
+    result = {}
+    for s in sessions:
+        sess_id = s["session_id"]
+        msgs = conn.execute("SELECT * FROM conversations WHERE session_id = ? ORDER BY timestamp ASC", (sess_id,)).fetchall()
+        result[sess_id] = [dict(m) for m in msgs]
+        
+    conn.close()
+    return result
+

@@ -36,21 +36,47 @@ class PythonREPLTool(Tool):
         import uuid
         import asyncio
         
-        code = kwargs.get("code")
+        code = kwargs.get("code", "")
+
+        # M-08 : Limite de taille du code (50 KB)
+        _MAX_CODE_SIZE = 50 * 1024  # 50 KB
+        if len(code.encode("utf-8")) > _MAX_CODE_SIZE:
+            return f"❌ Le code dépasse la limite autorisée de {_MAX_CODE_SIZE // 1024} KB."
+
         script_name = f"script_{uuid.uuid4().hex[:8]}.py"
         script_path = os.path.join("/app/workspace", script_name)
         
         try:
             with open(script_path, "w") as f:
                 f.write(code)
-                
-            # Exécution isolée : on purge les variables d'environnement (API keys)
-            proc = await asyncio.create_subprocess_exec(
+
+            # C-01 : Sandbox via bubblewrap (déjà installé dans le Dockerfile L27)
+            # --unshare-net  → coupe l'accès réseau (pas de reverse shell, pas d'exfiltration)
+            # --ro-bind / /  → filesystem en lecture seule
+            # --tmpfs /tmp   → /tmp éphémère (nettoyé à chaque exécution)
+            # --bind /app/workspace /app/workspace → seul workspace accessible en écriture
+            # env={"PATH": ...} → uniquement PATH, toutes les clés API supprimées
+            bwrap_cmd = [
+                "bwrap",
+                "--ro-bind", "/", "/",           # fs racine en lecture seule
+                "--dev", "/dev",                  # devices minimaux
+                "--tmpfs", "/tmp",                # /tmp isolé et éphémère
+                "--bind", "/app/workspace", "/app/workspace",  # workspace rw
+                "--unshare-net",                  # PAS de réseau
+                "--unshare-pid",                  # espace PID isolé
+                "--die-with-parent",              # tué si Jarvis meurt
                 "python3", script_path,
+            ]
+
+            # Garder uniquement PATH (pas de clés API, pas de tokens)
+            safe_env = {"PATH": "/usr/local/bin:/usr/bin:/bin"}
+
+            proc = await asyncio.create_subprocess_exec(
+                *bwrap_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd="/app/workspace",
-                env={} # No env vars (API keys)
+                env=safe_env,
             )
             
             try:
@@ -62,7 +88,7 @@ class PythonREPLTool(Tool):
                     output += f"--- STDERR ---\n{stderr.decode('utf-8')}\n"
                 
                 if proc.returncode == 0:
-                    return f"✅ Exécution réussie.\n{output}"
+                    return f"✅ Exécution réussie (sandbox bubblewrap — réseau coupé).\n{output}"
                 else:
                     return f"❌ Erreur d'exécution (Code {proc.returncode}).\n{output}"
             except asyncio.TimeoutError:

@@ -3,6 +3,7 @@ import httpx
 import os
 from typing import Dict, Any
 from .base import Tool
+from .filesystem import _safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +40,17 @@ class DocumentRAGTool(Tool):
     async def execute(self, **kwargs) -> str:
         file_path = kwargs.get("file_path")
         question = kwargs.get("question")
-        
-        if not os.path.exists(file_path):
+
+        # H-03 : Valider le chemin via le sandbox filesystem avant toute lecture
+        safe = _safe_path(file_path)
+        if safe is None:
+            return "🚫 Sécurité : chemin interdit. Le RAG est limité au répertoire /app/workspace."
+
+        if not safe.exists():
             return f"❌ Le fichier {file_path} n'existe pas."
             
         try:
-            with open(file_path, "r") as f:
+            with open(safe, "r") as f:
                 content = f.read()
                 
             # Truncate content to avoid token limits for this basic RAG version
@@ -63,7 +69,8 @@ class DocumentRAGTool(Tool):
                 resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
                 resp.raise_for_status()
                 data = resp.json()
-                return f"🧠 Résultat de la recherche RAG sur {os.path.basename(file_path)} :\n" + data["choices"][0]["message"]["content"]
+                return f"🧠 Résultat de la recherche RAG sur {safe.name} :\n" + data["choices"][0]["message"]["content"]
                 
         except Exception as e:
             return f"❌ Erreur RAG: {str(e)}"
+

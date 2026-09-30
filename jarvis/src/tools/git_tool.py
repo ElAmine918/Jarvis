@@ -56,6 +56,30 @@ class GitTool(Tool):
             
         if args[0] != "git":
             return "❌ Erreur de sécurité: Seul le binaire git est autorisé."
+
+        # H-04 : Allowlist des sous-commandes autorisées
+        _GIT_ALLOWED_SUBCOMMANDS = {
+            "status", "add", "commit", "diff", "log", "pull", "push",
+            "branch", "checkout", "merge", "fetch", "show", "stash",
+            "remote", "tag", "describe", "rev-parse", "ls-files",
+        }
+        # H-04 : Options dangereuses permettant l'exécution de code arbitraire
+        _GIT_DANGEROUS_FLAGS = {"-c", "--config", "--exec-path", "--git-dir", "--work-tree"}
+
+        subcommand = args[1] if len(args) > 1 else ""
+        if subcommand not in _GIT_ALLOWED_SUBCOMMANDS:
+            return (
+                f"🚫 Sécurité : sous-commande git '{subcommand}' non autorisée. "
+                f"Commandes permises : {', '.join(sorted(_GIT_ALLOWED_SUBCOMMANDS))}."
+            )
+
+        for arg in args[2:]:
+            flag = arg.split("=")[0]  # normalise --config=core.pager → --config
+            if flag in _GIT_DANGEROUS_FLAGS:
+                return (
+                    f"🚫 Sécurité : l'option '{flag}' est interdite car elle peut exécuter "
+                    f"du code arbitraire via les hooks git ou les commandes configurées."
+                )
             
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -75,3 +99,4 @@ class GitTool(Tool):
             return output if output else "✅ Commande exécutée avec succès (sans sortie)."
         except Exception as e:
             return f"❌ Erreur Git: {str(e)}"
+
