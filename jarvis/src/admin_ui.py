@@ -410,7 +410,7 @@ DASHBOARD_HTML = """
                     }
                 },
                 formatNumber(num) {
-                    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                    return num.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ",");
                 },
                 truncateText(text, length) {
                     if (!text) return "";
