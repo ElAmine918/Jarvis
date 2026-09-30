@@ -143,8 +143,30 @@ services:
     environment:
       OLLAMA_KEEP_ALIVE: "24h"
       OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_NUM_THREADS: 8
     volumes:
       - ollama-data:/root/.ollama
+    networks:
+      - jarvis-net
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "jarvis.manageable=false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ─── Chromium Headless Browser ──────────────────────────────────────────
+  chromium:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: chromium
+    restart: unless-stopped
+    environment:
+      - CONCURRENT=5
+      - QUEUE=5
+      - TIMEOUT=30000
     networks:
       - jarvis-net
     security_opt:
