@@ -10,7 +10,7 @@ from .config import (
     LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT,
     OPENROUTER_API_KEY, OPENROUTER_MODEL,
     OLLAMA_LOCAL_URL, OLLAMA_LOCAL_MODEL,
-    GEMINI_API_KEY
+    GEMINI_API_KEY, GEMINI_MODEL
 )
 from .agent import JarvisAgent
 from .router import check_endpoint
