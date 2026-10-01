@@ -66,6 +66,11 @@ async def main():
     await agent.init()
     logger.info("✅ Agent initialisé (mémoire SQLite prête)")
 
+    # Recharger les rappels planifiés survivant au redémarrage
+    from .tools.scheduler_tool import SchedulerTool
+    await SchedulerTool.reload_pending_jobs()
+    logger.info("✅ Rappels planifiés rechargés")
+
     # Lancer Telegram et l'API en parallèle
     await asyncio.gather(
         run_telegram(agent),

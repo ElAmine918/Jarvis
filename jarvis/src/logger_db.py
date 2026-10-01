@@ -42,6 +42,15 @@ def init_db():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS scheduled_jobs (
+            id TEXT PRIMARY KEY,
+            message TEXT NOT NULL,
+            fire_at DATETIME NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'pending'
+        )
+    ''')
     
     # Migrations if tables already exist but missing columns
     try: conn.execute("ALTER TABLE conversations ADD COLUMN session_id TEXT DEFAULT 'default'")
@@ -116,3 +125,30 @@ def get_conversations_by_session(limit_sessions: int = 10) -> Dict[str, List[Dic
     conn.close()
     return result
 
+def save_scheduled_job(job_id: str, message: str, fire_at: str) -> None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO scheduled_jobs (id, message, fire_at, status) VALUES (?, ?, ?, 'pending')",
+        (job_id, message, fire_at)
+    )
+    conn.commit()
+    conn.close()
+
+def get_pending_jobs() -> List[Dict[str, Any]]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM scheduled_jobs WHERE status = 'pending'").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def mark_job_fired(job_id: str) -> None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE scheduled_jobs SET status = 'fired' WHERE id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+
+def cancel_job(job_id: str) -> None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE scheduled_jobs SET status = 'cancelled' WHERE id = ?", (job_id,))
+    conn.commit()
+    conn.close()

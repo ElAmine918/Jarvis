@@ -7,3 +7,4 @@ aiosqlite~=0.20
 psutil~=6.1
 rich
 textual
+edge-tts

@@ -1,65 +1,139 @@
-# Jarvis AI - Autonomous Infrastructure Agent
+# ☁️ MyCloud — Personal AI Infrastructure
 
-Jarvis est un agent d'intelligence artificielle autonome conçu pour gérer, superviser et interagir avec l'infrastructure du homelab (serveur Proxmox / Docker). Il est pensé pour être robuste, hautement disponible (système de cascade de LLMs) et hautement sécurisé (Human-in-the-loop et isolation Docker).
+> Self-hosted AI assistant stack running on a hybrid homelab (Proxmox + Mac + Cloud), orchestrated by **Jarvis** — a multi-backend agentic AI with automatic failover.
 
-## 🌟 Fonctionnalités Principales
-
-*   **Intelligence en Cascade (Haute Disponibilité)** : 
-    *   *Tier 1 (Performance)* : Modèle local puissant (Qwen) hébergé sur Mac via LM Studio (réseau Tailscale).
-    *   *Tier 2 (Cloud Fallback)* : Gemini 3.5 Flash si le Mac est éteint ou inaccessible.
-    *   *Tier 3 (Survie Locale)* : Modèle léger (Llama 3.2 1B) hébergé sur un PC Toshiba local via Ollama si internet est coupé.
-*   **Sécurité et Isolation (Docker Socket Proxy)** : Jarvis n'a pas un accès "root" au démon Docker. Il communique via le proxy `tecnativa/docker-socket-proxy` sur un réseau isolé (`docker-proxy-net`), limitant strictement ses actions (lecture, start/stop, pas de suppression ou de création arbitraire). Le conteneur lui-même tourne en *no-new-privileges* avec toutes les capacités Linux retirées (`cap_drop: ALL`).
-*   **Human-in-the-loop (Bot Telegram Interactif)** : L'administrateur peut interagir avec Jarvis via un bot Telegram privé. Lorsqu'une action système critique (ex: arrêter le routeur principal) est requise, Jarvis se met en pause et envoie une **demande d'approbation interactive** (boutons Accepter/Refuser) sur Telegram avant d'exécuter l'action brute.
-*   **Mémoire Persistante (SQLite)** : Jarvis mémorise automatiquement de nouvelles "skills" (compétences ou contextes spécifiques) qu'il apprend au fil de la conversation.
-*   **Accès Web Sécurisé** : Jarvis peut lire des pages web et des dépôts GitHub pour s'informer, avec une protection stricte contre le SSRF (Server-Side Request Forgery) pour l'empêcher de scanner le réseau local interne.
+---
 
 ## 🏗️ Architecture
 
 ```text
-[ Proxmox ] -> [ LXC 100 (Ubuntu) ]
-                        |
-                        +-- [ Docker ]
-                              |-- caddy (Reverse Proxy)
-                              |-- open-webui (Interface Web UI)
-                              |-- docker-proxy (Filtre Sécurité Docker)
-                              |-- jarvis (Cerveau FastAPI / Telegram)
+                     ┌────────────────────────────────┐
+                     │           INTERNET              │
+                     └──────▲─────────────────▲────────┘
+                            │                 │
+                  Telegram / HTTPS    OpenRouter / Gemini APIs
+                            │                 │
+                            ▼                 ▼
+┌───────────────────────────────────────────┐    ┌──────────────────────────┐
+│  TOSHIBA LAPTOP (Proxmox VE 8 Server)    │    │  MAC M4 (Dev Machine)    │
+│  Intel i7-4700MQ · 16 GB DDR3            │    │  Tailscale VPN           │
+│                                           │    │  LM Studio (port 1234)   │
+│  ┌─────────────────────────────────────┐ │    └──────────▲───────────────┘
+│  │ LXC 100 (Ubuntu 24.04)              │ │               │
+│  │                                     │◄┴───────────────┘
+│  │  Docker Services:                   │     Tailscale Mesh
+│  │  ├─ jarvis       (AI Agent, :8080)  │
+│  │  ├─ open-webui   (Chat UI, :3000)   │
+│  │  ├─ caddy        (Reverse Proxy)    │
+│  │  ├─ docker-proxy (Socket Security)  │
+│  │  ├─ ollama       (Local SLM)        │
+│  │  ├─ chromium     (Headless Browser) │
+│  │  └─ portainer    (Docker Dashboard) │
+│  └─────────────────────────────────────┘ │
+└───────────────────────────────────────────┘
 ```
 
-## 🛠️ Outils de l'Agent
+## 🧠 Jarvis AI Agent
 
-*   `manage_docker` : Lister, inspecter et redémarrer les conteneurs (autorisés via le label `jarvis.manageable=true`).
-*   `ask_admin_approval` : Demander la permission à l'administrateur via Telegram pour exécuter une action Docker interdite en bypassant les labels de sécurité.
-*   `system_info` : Récupérer l'état du CPU, de la RAM (via `procps`) et de l'espace disque.
-*   `manage_files` : Lire ou écrire des fichiers exclusivement dans son espace de travail isolé (`/app/workspace` et `/app/data/skills`).
-*   `read_web_page` : Extraire et parser le contenu texte de sites publics.
+The core of the project. A personal AI assistant with a British butler persona, 18 sandboxed tools, and a 4-tier LLM failover cascade ensuring 24/7 availability.
 
-## 🚀 Déploiement
+**→ See [`jarvis/README.md`](jarvis/README.md) for full documentation.**
 
-### Pré-requis
-* Serveur Proxmox avec LXC Ubuntu
-* `create-lxc.sh` et `install-docker.sh` (dans le dossier `setup/`)
-* Un token de Bot Telegram
-* Tailscale (optionnel, pour l'accès aux LLMs locaux déportés)
+### LLM Cascade (Priority Order)
 
-### Installation
-1. Configurer les variables d'environnement dans `/app/.env` :
-```env
-TELEGRAM_BOT_TOKEN=ton_token
-ALLOWED_TELEGRAM_USER_IDS=ton_id_telegram
-LM_STUDIO_URL=http://<ip-tailscale>:1234/v1
-GEMINI_API_KEY=ta_cle_gemini
-OLLAMA_LOCAL_URL=http://ollama:11434/v1
-```
-2. Compiler et lancer l'agent :
+| Tier | Backend | Type | Default Model |
+|------|---------|------|---------------|
+| 1 | **Gemini Flash** | Cloud (Google) | `gemini-2.0-flash` |
+| 2 | **OpenRouter** | Cloud (Multi-provider) | `qwen/qwen3.8-27b:free` |
+| 3 | **LM Studio** | Local LAN (Mac M4) | `qwen2.5-14b-instruct` |
+| 4 | **Ollama** | Local Homelab (Toshiba) | `qwen2.5:7b` |
+
+If a backend fails mid-stream, the agent automatically cascades to the next tier.
+
+### Interfaces
+
+- **Telegram Bot** — Personal mobile interface with command system (`/status`, `/backend`, `/skills`, `/test_tiers`)
+- **Open WebUI** — Full-featured web chat UI (OpenAI-compatible API)
+- **Admin Dashboard** — Vue 3 real-time monitoring panel at `/admin`
+- **CLI Monitor** — Terminal TUI dashboard (Rich-based, 2 FPS live refresh)
+
+### Key Capabilities
+
+| Category | Tools |
+|----------|-------|
+| System & Files | Sandboxed filesystem, system metrics, Docker management |
+| Web & Research | Web scraping, news search, headless browser |
+| AI & Logic | Sub-agents, advisor panel, consensus fusion, Python REPL |
+| DevOps | Git operations, diff patching, document RAG |
+| Communication | Telegram reminders, human-in-the-loop approvals |
+| Media | Image generation, voice STT/TTS |
+
+## 🔒 Security
+
+- **Docker Socket Proxy** — Jarvis never touches the raw Docker socket. All Docker operations go through `tecnativa/docker-socket-proxy` on an isolated internal network.
+- **Container Hardening** — `no-new-privileges`, `cap_drop: ALL` (only `SETUID`/`SETGID` for user switching).
+- **Label Whitelisting** — Only containers with `jarvis.manageable=true` can be managed. All infrastructure containers are explicitly `false`.
+- **Filesystem Sandbox** — Agent can only read/write within `/app/workspace`.
+- **Shell Disabled** — No arbitrary command execution.
+- **Approval Workflow** — Critical Docker actions require interactive Telegram approval (inline keyboard).
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Proxmox VE server (or any Docker host)
+- Tailscale (optional, for Mac LM Studio access)
+- Telegram bot token from [@BotFather](https://t.me/BotFather)
+
+### Setup
+
 ```bash
-docker compose build --no-cache jarvis
-docker compose up -d
+# Clone the repo
+git clone https://github.com/ElAmine918/MyCloud.git
+cd MyCloud
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys and tokens
+
+# Launch everything
+docker compose up -d --build
 ```
 
-## 📱 Utilisation via Telegram
+### Verify
+- Send `/start` to your Telegram bot
+- Visit Open WebUI at `http://your-server:3000`
+- Access Admin Dashboard at `http://your-server:8080/admin`
 
-Une fois déployé, contactez votre bot sur Telegram.
-*   `/start` : Initie la conversation (seuls les IDs whitelistés sont autorisés).
-*   `/status` : Affiche l'état du serveur (CPU, RAM, Uptime).
-*   `/backend` : Affiche quel moteur IA (Mac, Gemini ou Toshiba) prend actuellement les commandes.
-*   `/skills` : Affiche tout ce que Jarvis a appris et mémorisé de façon permanente.
+## 📁 Repository Structure
+
+```
+MyCloud/
+├── .env.example           # Environment variable template
+├── docker-compose.yml     # Full service stack (7 containers)
+├── Caddyfile              # Reverse proxy configuration
+├── HANDOVER.md            # Technical handover document
+├── jarvis/                # AI Agent source code
+│   ├── README.md          # Detailed agent documentation
+│   ├── Dockerfile         # Multi-stage Python 3.12 build
+│   ├── requirements.txt   # Python dependencies
+│   ├── src/               # Application source (~3,750 LOC)
+│   ├── tests/             # Security adversarial tests
+│   └── skills/            # Skills system docs
+└── setup/                 # Infrastructure provisioning
+    ├── README.md           # Setup guide
+    ├── create-lxc.sh       # Proxmox LXC creation script
+    └── install-docker.sh   # Docker installation script
+```
+
+## 📖 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`jarvis/README.md`](jarvis/README.md) | Agent architecture, tools, security model |
+| [`HANDOVER.md`](HANDOVER.md) | Full technical handover (infrastructure, deployment, pitfalls) |
+| [`setup/README.md`](setup/README.md) | Infrastructure provisioning guide |
+| [`.env.example`](.env.example) | Complete environment variable reference |
+
+---
+
+**License**: MIT

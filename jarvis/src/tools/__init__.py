@@ -13,6 +13,7 @@ from .git_tool import GitTool
 from .image_tool import ImageGenerationTool
 from .apply_patch import ApplyPatchTool
 from .multi_agent import SubagentTool, AdvisorTool, FusionTool
+from .memory_recall import MemoryRecallTool
 
 __all__ = ["Tool", "ToolRegistry", "get_default_registry"]
 
@@ -33,6 +34,7 @@ def get_default_registry() -> ToolRegistry:
     registry.register(ImageGenerationTool())
     registry.register(PythonREPLTool())
     registry.register(DocumentRAGTool())
+    registry.register(MemoryRecallTool())
     registry.register(SchedulerTool())
     registry.register(GitTool())
     return registry

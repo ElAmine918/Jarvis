@@ -53,7 +53,9 @@ jarvis/data/
 *.log
 logs/
 
-# --- Temp ---
+# --- Temp & Deployment artifacts ---
 *.tmp
+*.tar.gz
 tmp/
 scratch/
+test_*.py

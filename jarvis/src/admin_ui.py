@@ -58,7 +58,8 @@ DASHBOARD_HTML = """
             border: 1px solid var(--glass-border);
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
             border-radius: 16px;
-            transition: all 0.3s ease;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            transform: translateZ(0); /* Force GPU composite to prevent disappearing bug */
         }
         
         .glass-panel:hover {

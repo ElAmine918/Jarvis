@@ -3,17 +3,20 @@ import datetime
 import psutil
 from telegram import Update
 from telegram.constants import ParseMode, ChatAction
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
 from .config import (
     TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS, 
     LM_STUDIO_URL, LM_STUDIO_HEALTH_TIMEOUT,
     OPENROUTER_API_KEY, OPENROUTER_MODEL,
     OLLAMA_LOCAL_URL, OLLAMA_LOCAL_MODEL,
-    GEMINI_API_KEY, GEMINI_MODEL
+    GEMINI_API_KEY, GEMINI_MODEL,
+    VOICE_TTS_ENABLED
 )
 from .agent import JarvisAgent
 from .router import check_endpoint
+from .approvals import PENDING_APPROVALS, APPROVAL_RESULTS
+from .voice import transcribe_voice, synthesize_speech
 
 logger = logging.getLogger(__name__)
 START_TIME = datetime.datetime.now()
@@ -326,6 +329,77 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Une erreur interne s'est produite. Réessaie dans un instant.")
 
 
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+    
+    user_id = update.effective_user.id
+    agent: JarvisAgent = context.bot_data["agent"]
+    
+    # Download the voice file
+    voice = update.message.voice or update.message.audio
+    if not voice:
+        return
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    try:
+        # Download file bytes
+        file = await context.bot.get_file(voice.file_id)
+        file_bytes = await file.download_as_bytearray()
+        
+        # STT: Transcribe voice to text
+        user_text = await transcribe_voice(bytes(file_bytes))
+        if not user_text or user_text.startswith("❌"):
+            await update.message.reply_text(user_text or "❌ Impossible de transcrire l'audio.")
+            return
+        
+        # Show what was understood
+        await update.message.reply_text(f"🎙 _{user_text}_", parse_mode=ParseMode.MARKDOWN)
+        
+        # Process through Jarvis (same as handle_message)
+        if "history" not in context.user_data:
+            context.user_data["history"] = []
+        history = context.user_data["history"]
+        history.append({"role": "user", "content": user_text})
+        if len(history) > 10:
+            history = history[-10:]
+        
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
+        response = ""
+        async for chunk in agent.process_message(history, str(user_id)):
+            response += chunk
+        
+        history.append({"role": "assistant", "content": response})
+        
+        from .logger_db import log_conversation
+        log_conversation(str(user_id), "telegram", str(user_id), f"[VOICE] {user_text}", response, getattr(agent, 'last_backend_used', 'unknown'))
+        
+        # Send text response
+        if len(response) < 4000:
+            try:
+                await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await update.message.reply_text(response)
+        else:
+            await _send_long(update, response)
+        
+        # TTS: Send voice response (mirror the channel)
+        if VOICE_TTS_ENABLED:
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.RECORD_VOICE)
+            audio_bytes = await synthesize_speech(response)
+            if audio_bytes:
+                from io import BytesIO
+                voice_file = BytesIO(audio_bytes)
+                voice_file.name = "response.mp3"
+                await update.message.reply_voice(voice=voice_file)
+                
+    except Exception as e:
+        logger.error(f"Erreur traitement vocal: {e}", exc_info=True)
+        await update.message.reply_text("❌ Une erreur s'est produite lors du traitement vocal.")
+
+
 def build_app(agent: JarvisAgent) -> Application:
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN manquant dans .env")
@@ -366,13 +440,11 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(CommandHandler("test_tiers", cmd_test_tiers, block=False))
     app.add_handler(CommandHandler("reset", cmd_reset, block=False))
     app.add_handler(CommandHandler("silent", cmd_silent, block=False))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice, block=False))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False))
     app.add_handler(CallbackQueryHandler(handle_callback, block=False))
 
     return app
-
-from telegram.ext import CallbackQueryHandler
-from .approvals import PENDING_APPROVALS, APPROVAL_RESULTS
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
