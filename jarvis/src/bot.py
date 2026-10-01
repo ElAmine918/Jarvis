@@ -73,21 +73,20 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
     msg = (
-        "💡 *GUIDE D'UTILISATION JARVIS*\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
-        "Voici quelques exemples de ce que tu peux me demander :\n\n"
-        "🌐 *Recherche & Navigation Web* :\n"
-        "• _« Quelles sont les dernières actus tech aujourd'hui ? »_\n"
-        "• _« Va sur https://news.ycombinator.com et résume le premier article »_\n"
-        "• _« Quelle est la météo à Montréal cette semaine ? »_\n\n"
-        "🐳 *Conteneurs Docker & Infrastructure* :\n"
-        "• _« Liste les conteneurs en cours d'exécution »_\n"
-        "• _« Redémarre le conteneur caddy »_\n"
-        "• _« Donne-moi l'utilisation des ressources du serveur »_\n\n"
-        "📊 *Commandes Rapides* :\n"
-        "• `/status` : Bilan instantané des ressources matérielles.\n"
-        "• `/backend` : Voir si c'est ton Mac M4, OpenRouter, Gemini ou le Toshiba qui répond.\n"
-        "• `/skills` : Afficher la mémoire à long terme."
+        "💡 *GUIDE DES COMMANDES JARVIS*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🗣️ *Conversations & Contexte :*\n"
+        "• `/silent <texte>` : Pose une question éphémère (le contexte est ignoré et rien n'est sauvegardé).\n"
+        "• `/reset` : 🧹 Efface notre historique immédiat pour repartir de zéro (économise les tokens).\n\n"
+        "⚙️ *Monitoring & Moteurs IA :*\n"
+        "• `/status` : 📊 Bilan matériel (CPU, RAM, Disque) et état réseau des API (Proxmox/Local).\n"
+        "• `/backend` : 🤖 Affiche la cascade IA (Quel modèle va répondre en priorité actuellement).\n"
+        "• `/test_tiers` : 🧪 Ping chaque modèle (Mac, OpenRouter, Gemini, Toshiba) pour vérifier leur fonctionnement.\n\n"
+        "🧠 *Mémoire & Capacités :*\n"
+        "• `/skills` : Affiche les compétences apprises par Jarvis à long terme.\n"
+        "• `/help` : Affiche ce menu d'aide.\n\n"
+        "💬 *En conversation libre :*\n"
+        "Tu peux lui demander directement : _« Liste les conteneurs »_, _« Lance une recherche web »_, _« Lis ce fichier »_ ou _« Invoque un subagent »_ !"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
