@@ -47,12 +47,13 @@ async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
                     for m in data.get("models", []):
                         name = m.get("name", "").replace("models/", "")
                         # On filtre pour ne garder que les modèles de génération de texte "Flash" ou "Pro"
-                        # et on exclut explicitement les modèles spécialisés image/audio pour éviter les erreurs.
+                        # et on exclut explicitement les modèles spécialisés image/audio/lite pour éviter les erreurs.
                         name_lower = name.lower()
                         if "generateContent" in m.get("supportedGenerationMethods", []):
                             if ("flash" in name_lower or "pro" in name_lower) and \
                                "image" not in name_lower and \
-                               "tts" not in name_lower:
+                               "tts" not in name_lower and \
+                               "lite" not in name_lower:
                                 models.append(name)
                     _gemini_models_cache = models
                     _gemini_models_cache_time = time.time()
