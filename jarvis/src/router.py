@@ -47,9 +47,12 @@ async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
                     for m in data.get("models", []):
                         name = m.get("name", "").replace("models/", "")
                         # On filtre pour ne garder que les modèles de génération de texte "Flash" ou "Pro"
-                        # qui sont pertinents pour le chat
+                        # et on exclut explicitement les modèles spécialisés image/audio pour éviter les erreurs.
+                        name_lower = name.lower()
                         if "generateContent" in m.get("supportedGenerationMethods", []):
-                            if "flash" in name.lower() or "pro" in name.lower():
+                            if ("flash" in name_lower or "pro" in name_lower) and \
+                               "image" not in name_lower and \
+                               "tts" not in name_lower:
                                 models.append(name)
                     _gemini_models_cache = models
                     _gemini_models_cache_time = time.time()
@@ -71,8 +74,16 @@ async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
             
     return final_models
 
+_dead_models = {}
+
+def mark_model_dead(model_name: str, duration_seconds: int = 86400):
+    """Marque un modèle comme 'mort' (ex: Quota 429 atteint) pour l'exclure pendant X secondes."""
+    _dead_models[model_name] = time.time() + duration_seconds
+    logger.info(f"Circuit Breaker: Le modèle {model_name} est désactivé pour {duration_seconds}s.")
+
 async def get_all_backends() -> list:
     backends = []
+    current_time = time.time()
     
     # 1. Priorité absolue : Cloud Performant (Gemini Flash Cascade Dynamique)
     if GEMINI_API_KEY:
@@ -80,6 +91,9 @@ async def get_all_backends() -> list:
         gemini_models = await get_dynamic_gemini_models(GEMINI_API_KEY, GEMINI_MODEL)
         
         for m in gemini_models:
+            # Vérifier le Circuit Breaker
+            if m in _dead_models and current_time < _dead_models[m]:
+                continue
             backends.append((f"Gemini ({m})", gemini_client, m))
         
     # 2. Fallback Cloud : OpenRouter (Qwen 3.8 27B, etc.)
