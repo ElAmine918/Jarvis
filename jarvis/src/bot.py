@@ -73,22 +73,22 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
     msg = (
-        "💡 *GUIDE DES COMMANDES JARVIS*\n"
+        "💡 <b>GUIDE DES COMMANDES JARVIS</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🗣️ *Conversations & Contexte :*\n"
-        "/silent <texte> : Pose une question éphémère (le contexte est ignoré et rien n'est sauvegardé).\n"
+        "🗣️ <b>Conversations & Contexte :</b>\n"
+        "/silent &lt;texte&gt; : Pose une question éphémère (le contexte est ignoré et rien n'est sauvegardé).\n"
         "/reset : 🧹 Efface notre historique immédiat pour repartir de zéro (économise les tokens).\n\n"
-        "⚙️ *Monitoring & Moteurs IA :*\n"
+        "⚙️ <b>Monitoring & Moteurs IA :</b>\n"
         "/status : 📊 Bilan matériel (CPU, RAM, Disque) et état réseau des API (Proxmox/Local).\n"
         "/backend : 🤖 Affiche la cascade IA (Quel modèle va répondre en priorité actuellement).\n"
         "/test_tiers : 🧪 Ping chaque modèle pour vérifier leur fonctionnement.\n\n"
-        "🧠 *Mémoire & Capacités :*\n"
+        "🧠 <b>Mémoire & Capacités :</b>\n"
         "/skills : Affiche les compétences apprises par Jarvis à long terme.\n"
         "/help : Affiche ce menu d'aide.\n\n"
-        "💬 *En conversation libre :*\n"
-        "Tu peux lui demander directement : _« Liste les conteneurs »_, _« Lance une recherche web »_, _« Lis ce fichier »_ ou _« Invoque un subagent »_ !"
+        "💬 <b>En conversation libre :</b>\n"
+        "Tu peux lui demander directement : <i>« Liste les conteneurs »</i>, <i>« Lance une recherche web »</i>, <i>« Lis ce fichier »</i> ou <i>« Invoque un subagent »</i> !"
     )
-    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
