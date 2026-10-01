@@ -8,3 +8,5 @@ psutil~=6.1
 rich
 textual
 edge-tts
+proxmoxer
+requests

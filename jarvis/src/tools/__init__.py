@@ -14,6 +14,7 @@ from .image_tool import ImageGenerationTool
 from .apply_patch import ApplyPatchTool
 from .multi_agent import SubagentTool, AdvisorTool, FusionTool
 from .memory_recall import MemoryRecallTool
+from .proxmox_tool import ProxmoxStatusTool, ProxmoxActionTool
 
 __all__ = ["Tool", "ToolRegistry", "get_default_registry"]
 
@@ -37,4 +38,6 @@ def get_default_registry() -> ToolRegistry:
     registry.register(MemoryRecallTool())
     registry.register(SchedulerTool())
     registry.register(GitTool())
+    registry.register(ProxmoxStatusTool())
+    registry.register(ProxmoxActionTool())
     return registry

@@ -32,6 +32,25 @@ class MemoryManager:
                 )
             ''')
             await db.execute('''
+                CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts USING fts5(name, description, content, content_rowid='id');
+            ''')
+            await db.execute('''
+                CREATE TRIGGER IF NOT EXISTS skills_ai AFTER INSERT ON skills BEGIN
+                  INSERT INTO skills_fts(rowid, name, description, content) VALUES (new.id, new.name, new.description, new.content);
+                END;
+            ''')
+            await db.execute('''
+                CREATE TRIGGER IF NOT EXISTS skills_ad AFTER DELETE ON skills BEGIN
+                  INSERT INTO skills_fts(skills_fts, rowid, name, description, content) VALUES('delete', old.id, old.name, old.description, old.content);
+                END;
+            ''')
+            await db.execute('''
+                CREATE TRIGGER IF NOT EXISTS skills_au AFTER UPDATE ON skills BEGIN
+                  INSERT INTO skills_fts(skills_fts, rowid, name, description, content) VALUES('delete', old.id, old.name, old.description, old.content);
+                  INSERT INTO skills_fts(rowid, name, description, content) VALUES (new.id, new.name, new.description, new.content);
+                END;
+            ''')
+            await db.execute('''
                 CREATE TABLE IF NOT EXISTS facts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     key TEXT UNIQUE NOT NULL,
@@ -78,12 +97,21 @@ class MemoryManager:
             return None
 
     async def search_skills(self, query: str) -> List[Dict[str, str]]:
-        """Recherche des compétences (simple LIKE sur le nom et la description)."""
+        """Recherche des compétences via FTS5."""
         try:
             async with aiosqlite.connect(self.db_path) as db:
                 db.row_factory = aiosqlite.Row
-                like_query = f"%{query}%"
-                async with db.execute('SELECT * FROM skills WHERE name LIKE ? OR description LIKE ?', (like_query, like_query)) as cursor:
+                if not query:
+                    async with db.execute('SELECT * FROM skills') as cursor:
+                        rows = await cursor.fetchall()
+                        return [dict(row) for row in rows]
+                        
+                async with db.execute('''
+                    SELECT skills.* FROM skills_fts 
+                    JOIN skills ON skills.id = skills_fts.rowid 
+                    WHERE skills_fts MATCH ? 
+                    ORDER BY rank
+                ''', (query,)) as cursor:
                     rows = await cursor.fetchall()
                     return [dict(row) for row in rows]
         except Exception as e:

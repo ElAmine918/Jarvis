@@ -24,12 +24,63 @@ async def check_endpoint(url: str, timeout: float = 3.5) -> bool:
     except Exception:
         return False
 
+import time
+
+_gemini_models_cache = []
+_gemini_models_cache_time = 0
+
+async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
+    global _gemini_models_cache, _gemini_models_cache_time
+    
+    # Utilisation du cache (valide 1 heure) pour ne pas spammer l'API
+    if _gemini_models_cache and (time.time() - _gemini_models_cache_time) < 3600:
+        models = _gemini_models_cache
+    else:
+        try:
+            async with httpx.AsyncClient() as client:
+                # Endpoint natif Google API pour lister les modèles (documentation Gemini API)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+                res = await client.get(url, timeout=3.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    models = []
+                    for m in data.get("models", []):
+                        name = m.get("name", "").replace("models/", "")
+                        # On filtre pour ne garder que les modèles de génération de texte "Flash" ou "Pro"
+                        # qui sont pertinents pour le chat
+                        if "generateContent" in m.get("supportedGenerationMethods", []):
+                            if "flash" in name.lower() or "pro" in name.lower():
+                                models.append(name)
+                    _gemini_models_cache = models
+                    _gemini_models_cache_time = time.time()
+                else:
+                    models = []
+        except Exception as e:
+            logger.warning(f"Impossible de récupérer dynamiquement les modèles Gemini : {e}")
+            models = []
+            
+    # Fallback robuste en cas d'échec de l'API
+    if not models:
+        models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        
+    # S'assurer que le modèle principal choisi dans le .env est toujours en premier
+    final_models = [primary_model]
+    for m in models:
+        if m not in final_models:
+            final_models.append(m)
+            
+    return final_models
+
 async def get_all_backends() -> list:
     backends = []
     
-    # 1. Priorité absolue : Cloud Performant (Gemini Flash)
+    # 1. Priorité absolue : Cloud Performant (Gemini Flash Cascade Dynamique)
     if GEMINI_API_KEY:
-        backends.append(("Gemini Flash (Cloud)", AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY), GEMINI_MODEL))
+        gemini_client = AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY)
+        gemini_models = await get_dynamic_gemini_models(GEMINI_API_KEY, GEMINI_MODEL)
+        
+        for m in gemini_models:
+            backends.append((f"Gemini ({m})", gemini_client, m))
         
     # 2. Fallback Cloud : OpenRouter (Qwen 3.8 27B, etc.)
     if OPENROUTER_API_KEY:

@@ -17,6 +17,12 @@ ALLOWED_TELEGRAM_USER_IDS: List[int] = [
     int(uid.strip()) for uid in os.getenv("ALLOWED_TELEGRAM_USER_IDS", "").split(",") if uid.strip()
 ]
 
+# --- Proxmox ---
+PROXMOX_HOST = os.getenv("PROXMOX_HOST", "192.168.2.100")
+PROXMOX_USER = os.getenv("PROXMOX_USER", "root@pam")
+PROXMOX_TOKEN_NAME = os.getenv("PROXMOX_TOKEN_NAME", "jarvis")
+PROXMOX_TOKEN_VALUE = os.getenv("PROXMOX_TOKEN_VALUE", "")
+
 # --- LM Studio (local, sur le Mac via Tailscale) ---
 # URL de l'API OpenAI-compatible de LM Studio
 LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://100.x.x.x:1234/v1")
