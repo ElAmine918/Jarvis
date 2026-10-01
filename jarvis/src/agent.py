@@ -75,7 +75,7 @@ class JarvisAgent:
             else:
                 if "Generate a concise title" in content or "follow_ups" in content or "JSON" in content:
                     continue
-                clean_content = content.split("\n\n_— ⚡️")[0]
+                clean_content = content.split("\n\n— ")[0]
                 filtered_msgs.append({"role": m["role"], "content": clean_content})
             
                 dynamic_system_prompt = SYSTEM_PROMPT

@@ -76,15 +76,15 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
     msg = (
-        "💡 <b>COMMANDES JARVIS</b>\\n"
-        "━━━━━━━━━━━━━━━━━━━━━\\n"
-        "/silent &lt;texte&gt; : Question sans contexte\\n"
-        "/reset : 🧹 Efface l'historique\\n"
-        "/status : 📊 Bilan matériel\\n"
-        "/backend : 🤖 Routage Neural (modèles dispo)\\n"
-        "/test_tiers : 🧪 Ping des backends\\n"
-        "/skills : Compétences\\n"
-        "/show : Affiche/masque le modèle\\n"
+        "💡 <b>COMMANDES JARVIS</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "/silent &lt;texte&gt; : Question sans contexte\n"
+        "/reset : 🧹 Efface l'historique\n"
+        "/status : 📊 Bilan matériel\n"
+        "/backend : 🤖 Routage Neural (modèles dispo)\n"
+        "/test_tiers : 🧪 Ping des backends\n"
+        "/skills : Compétences\n"
+        "/show : Affiche/masque le modèle\n"
         "/help : Ce menu"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
@@ -160,14 +160,14 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top_model = pool[0][2] if pool else "Aucun"
     
     msg = (
-        "🤖 *NEURAL ROUTER*\\n"
-        "━━━━━━━━━━━━━━━━━━━━━\\n"
-        f"☁️ *Gemini* : {len(gemini)} modèles\\n"
-        f"🌐 *OpenRouter* : {len(openrouter)} modèles\\n"
-        f"🖥️ *Local* : {len(local)} modèles\\n\\n"
-        f"🛡️ *Circuit Breaker* : {dead_count} bloqué(s)\\n"
-        "━━━━━━━━━━━━━━━━━━━━━\\n"
-        f"🏆 *Tête de liste* : `{top_model}`\\n"
+        "🤖 *NEURAL ROUTER*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"☁️ *Gemini* : {len(gemini)} modèles\n"
+        f"🌐 *OpenRouter* : {len(openrouter)} modèles\n"
+        f"🖥️ *Local* : {len(local)} modèles\n\n"
+        f"🛡️ *Circuit Breaker* : {dead_count} bloqué(s)\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 *Tête de liste* : `{top_model}`\n"
         f"ℹ️ *Dernier utilisé* : `{getattr(agent, 'last_backend_used', 'Inconnu')}`"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
@@ -269,7 +269,7 @@ async def cmd_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_state = context.user_data["show_signature"]
     
     state_str = "ACTIVÉE ✅" if new_state else "DÉSACTIVÉE ❌"
-    msg = f"🪧 **Affichage du modèle** : {state_str}\\n"
+    msg = f"🪧 **Affichage du modèle** : {state_str}\n"
     if new_state:
         msg += "Le nom du modèle sera discrètement affiché à la fin de mes réponses."
     else:
@@ -325,7 +325,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         show_signature = context.user_data.get("show_signature", False)
         if show_signature:
             # Rendre ça ultra sobre
-            response += f"\\n\\n_— ⚡️ {backend_used}_"
+            response += f"\n\n— {backend_used}"
             
         # Envoi final du message
         if len(response) < 4000:
