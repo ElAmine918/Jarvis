@@ -82,7 +82,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/reset : 🧹 Efface l'historique\n"
         "/status : 📊 Bilan matériel\n"
         "/backend : 🤖 Routage Neural (modèles dispo)\n"
-        "/test_tiers : 🧪 Ping des backends\n"
+        "/ping : 🧪 Ping des API\n"
         "/skills : Compétences\n"
         "/show : Affiche/masque le modèle\n"
         "/help : Ce menu"
@@ -188,38 +188,39 @@ async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
-async def cmd_test_tiers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
         
-    msg = await update.message.reply_text("⏳ *Test fonctionnel des tiers en cours...*", parse_mode=ParseMode.MARKDOWN)
+    msg = await update.message.reply_text("📡 *Lancement du Ping...*", parse_mode=ParseMode.MARKDOWN)
+    
     agent: JarvisAgent = context.bot_data["agent"]
     user_id = update.effective_user.id
     
-    tiers = [
-        ("Tier 1 (LM Studio)", "jarvis-mac"),
-        ("Tier 2 (OpenRouter)", "jarvis-openrouter"),
-        ("Tier 3 (Gemini)", "jarvis-gemini"),
-        ("Tier 4 (Ollama)", "jarvis-ollama")
+    # We test the providers directly
+    providers = [
+        ("Google (Gemini)", "jarvis-gemini"),
+        ("Cloud (OpenRouter)", "jarvis-openrouter"),
+        ("Local (LM Studio)", "jarvis-mac"),
+        ("Local (Ollama)", "jarvis-ollama")
     ]
     
     results = []
-    for name, model_id in tiers:
+    for name, model_id in providers:
         try:
             response = ""
             async for chunk in agent.process_message([{"role": "user", "content": "Réponds uniquement par 'OK'."}], str(user_id), requested_model=model_id):
                 response += chunk
             
             if "❌" in response:
-                # Extraire juste l'erreur courte
                 err = response.replace("❌", "").strip()
                 results.append(f"🔴 *{name}* : Échec ({err})")
             else:
-                results.append(f"🟢 *{name}* : Succès (Réponse: `{response.strip()}`)")
+                results.append(f"🟢 *{name}* : Succès")
         except Exception as e:
-            results.append(f"🔴 *{name}* : Erreur système ({e})")
+            results.append(f"🔴 *{name}* : Erreur ({e})")
             
-    final_text = "📊 *RÉSULTAT DES TESTS FONCTIONNELS*\n━━━━━━━━━━━━━━━━━━━━━\n\n" + "\n\n".join(results)
+    final_text = "📊 *DIAGNOSTIC RÉSEAU*\\n━━━━━━━━━━━━━━━━━━━━━\\n\\n" + "\\n".join(results)
     await msg.edit_text(final_text, parse_mode=ParseMode.MARKDOWN)
 
 
@@ -451,7 +452,7 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(CommandHandler("status", cmd_status, block=False))
     app.add_handler(CommandHandler("backend", cmd_backend, block=False))
     app.add_handler(CommandHandler("skills", cmd_skills, block=False))
-    app.add_handler(CommandHandler("test_tiers", cmd_test_tiers, block=False))
+    app.add_handler(CommandHandler("ping", cmd_ping, block=False))
     app.add_handler(CommandHandler("reset", cmd_reset, block=False))
     app.add_handler(CommandHandler("silent", cmd_silent, block=False))
     app.add_handler(CommandHandler("show", cmd_show, block=False))

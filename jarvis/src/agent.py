@@ -202,7 +202,7 @@ class JarvisAgent:
                     except json.JSONDecodeError:
                         tool_args = {}
                         
-                    yield f"\n\n⚙️ *Exécution de {tool_name}...*\n\n"
+                    yield f"\n⚙️ *Exécution de {tool_name}...*"
                         
                     from .logger_db import log_action
                     logger.info(f"Tool call: {tool_name}({tool_args})")
