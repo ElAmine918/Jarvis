@@ -76,20 +76,16 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
     msg = (
-        "💡 <b>GUIDE DES COMMANDES JARVIS</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🗣️ <b>Conversations & Contexte :</b>\n"
-        "/silent &lt;texte&gt; : Pose une question éphémère (le contexte est ignoré et rien n'est sauvegardé).\n"
-        "/reset : 🧹 Efface notre historique immédiat pour repartir de zéro (économise les tokens).\n\n"
-        "⚙️ <b>Monitoring & Moteurs IA :</b>\n"
-        "/status : 📊 Bilan matériel (CPU, RAM, Disque) et état réseau des API (Proxmox/Local).\n"
-        "/backend : 🤖 Affiche la cascade IA (Quel modèle va répondre en priorité actuellement).\n"
-        "/test_tiers : 🧪 Ping chaque modèle pour vérifier leur fonctionnement.\n\n"
-        "🧠 <b>Mémoire & Capacités :</b>\n"
-        "/skills : Affiche les compétences apprises par Jarvis à long terme.\n"
-        "/help : Affiche ce menu d'aide.\n\n"
-        "💬 <b>En conversation libre :</b>\n"
-        "Tu peux lui demander directement : <i>« Liste les conteneurs »</i>, <i>« Lance une recherche web »</i>, <i>« Lis ce fichier »</i> ou <i>« Invoque un subagent »</i> !"
+        "💡 <b>COMMANDES JARVIS</b>\\n"
+        "━━━━━━━━━━━━━━━━━━━━━\\n"
+        "/silent &lt;texte&gt; : Question sans contexte\\n"
+        "/reset : 🧹 Efface l'historique\\n"
+        "/status : 📊 Bilan matériel\\n"
+        "/backend : 🤖 Routage Neural (modèles dispo)\\n"
+        "/test_tiers : 🧪 Ping des backends\\n"
+        "/skills : Compétences\\n"
+        "/show : Affiche/masque le modèle\\n"
+        "/help : Ce menu"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
@@ -144,43 +140,41 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
 
+    from .router import _dead_models
+    import time
+    
     agent: JarvisAgent = context.bot_data["agent"]
-
-    lm_up = await check_endpoint(LM_STUDIO_URL, 2.5)
-    ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 1.5)
-
-    # Statuts détaillés
-    t1_status = f"🟢 Configuré (Clé API active : `{GEMINI_MODEL}`)" if GEMINI_API_KEY else "⚪️ Non configuré"
-    t2_status = f"🟢 Actif (`{OPENROUTER_MODEL}`)" if OPENROUTER_API_KEY else "⚪️ Non configuré"
-    t3_status = "🟢 En ligne (Mac via Tailscale)" if lm_up else "🔴 Inaccessible (Mac éteint ou hors réseau)"
-    t4_status = f"🟢 En ligne (`{OLLAMA_LOCAL_MODEL}` - 8 cœurs)" if ollama_up else "🔴 Inaccessible"
-
-    if GEMINI_API_KEY:
-        lead = "☁️ *Tier 1 : Google Gemini (Cloud Power)* prend la priorité absolue."
-    elif OPENROUTER_API_KEY:
-        lead = f"🌐 *Tier 2 : OpenRouter ({OPENROUTER_MODEL})* prend le relais."
-    elif lm_up:
-        lead = "🍏 *Tier 3 : Mac M4 (LM Studio)* prend le relais en local."
-    elif ollama_up:
-        lead = "🦙 *Tier 4 : Toshiba (Ollama)* actif en survie locale autonome."
-    else:
-        lead = "❌ Aucun backend ne répond actuellement."
+    
+    # We call get_all_backends locally to see the pool (without history)
+    from .router import get_all_backends
+    pool = await get_all_backends(history=[])
+    
+    current_time = time.time()
+    dead_str = ""
+    for m, t in _dead_models.items():
+        if t > current_time:
+            rem = int((t - current_time) / 60)
+            dead_str += f"- {m} (bloqué {rem}m)\\n"
+            
+    if not dead_str:
+        dead_str = "Aucun modèle bloqué."
+        
+    active_str = ""
+    for b in pool:
+        active_str += f"- {b[2]}\\n"
+        
+    if not active_str:
+        active_str = "Aucun modèle disponible."
 
     msg = (
-        "🤖 *ARCHITECTURE DES MOTEURS IA*\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"1️⃣ *Tier 1 (Intelligence Ultime - Gemini)* :\n"
-        f"   └ {t1_status}\n\n"
-        f"2️⃣ *Tier 2 (Cloud Alternatif - OpenRouter)* :\n"
-        f"   └ {t2_status}\n\n"
-        f"3️⃣ *Tier 3 (Local Puissant - Mac M4)* :\n"
-        f"   └ {t3_status}\n\n"
-        f"4️⃣ *Tier 4 (Survie Locale - Toshiba Ollama)* :\n"
-        f"   └ {t4_status}\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👉 *Priorité actuelle* :\n{lead}\n\n"
-        f"ℹ️ *Dernier modèle utilisé* :\n`{agent.last_backend_used}`"
+        "🤖 *NEURAL ROUTER STATUS*\\n"
+        "━━━━━━━━━━━━━━━━━━━━━\\n"
+        f"*Modèles Disponibles :*\\n{active_str}\\n"
+        f"*Circuit Breaker :*\\n{dead_str}\\n"
+        "━━━━━━━━━━━━━━━━━━━━━\\n"
+        f"ℹ️ *Dernier modèle utilisé* : `{getattr(agent, 'last_backend_used', 'Inconnu')}`"
     )
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
