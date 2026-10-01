@@ -1,10 +1,14 @@
 import httpx
 import logging
 import json
+import os
 from typing import Dict, Any
 from .base import Tool
 
 logger = logging.getLogger(__name__)
+
+def _get_api_headers():
+    return {"Authorization": f"Bearer {os.getenv('JARVIS_API_KEY', '')}"}
 
 class SubagentTool(Tool):
     @property
@@ -40,8 +44,6 @@ class SubagentTool(Tool):
         task = kwargs.get("task")
         model_tier = kwargs.get("model_tier", "jarvis-auto")
         
-        # We call the local Jarvis API so it handles the fallback and tool execution naturally!
-        # Since we are inside the docker network, we can use http://127.0.0.1:8080/v1/chat/completions
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 payload = {
@@ -49,7 +51,7 @@ class SubagentTool(Tool):
                     "messages": [{"role": "user", "content": f"Tu es un sous-agent. Voici ta tâche :\n\n{task}"}],
                     "stream": False
                 }
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
+                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
                 resp.raise_for_status()
                 data = resp.json()
                 return f"Réponse du sous-agent ({model_tier}) :\n" + data["choices"][0]["message"]["content"]
@@ -90,7 +92,6 @@ class AdvisorTool(Tool):
         question = kwargs.get("question")
         context = kwargs.get("context", "")
         
-        # Toujours utiliser Gemini Flash (très rapide et puissant) pour l'advisor, ou jarvis-auto
         prompt = f"Tu es un conseiller expert. Voici le contexte actuel :\n{context}\n\nQuestion de l'agent principal :\n{question}\n\nDonne une analyse critique et des conseils."
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -99,7 +100,7 @@ class AdvisorTool(Tool):
                     "messages": [{"role": "user", "content": prompt}],
                     "stream": False
                 }
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
+                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
                 resp.raise_for_status()
                 data = resp.json()
                 return "Avis du Conseiller :\n" + data["choices"][0]["message"]["content"]
@@ -139,12 +140,12 @@ class FusionTool(Tool):
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
                     payload = {"model": model_id, "messages": [{"role": "user", "content": problem}], "stream": False}
-                    resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
+                    resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                    resp.raise_for_status()
                     return resp.json()["choices"][0]["message"]["content"]
             except Exception:
                 return "Échec de ce panéliste."
 
-        # Demander à Gemini et Ollama en parallèle
         results = await asyncio.gather(
             ask_model("jarvis-gemini"),
             ask_model("jarvis-ollama"),
@@ -154,13 +155,13 @@ class FusionTool(Tool):
         gemini_ans = results[0] if not isinstance(results[0], Exception) else "Erreur"
         ollama_ans = results[1] if not isinstance(results[1], Exception) else "Erreur"
         
-        # Synthèse par l'analyste (Jarvis-Auto)
         synthesis_prompt = f"Tu es l'Analyste Fusion. Voici le problème initial :\n{problem}\n\nRéponse Panéliste 1 (Gemini):\n{gemini_ans}\n\nRéponse Panéliste 2 (Ollama):\n{ollama_ans}\n\nSynthétise la meilleure réponse."
         
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 payload = {"model": "jarvis-auto", "messages": [{"role": "user", "content": synthesis_prompt}], "stream": False}
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload)
+                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                resp.raise_for_status()
                 final_synth = resp.json()["choices"][0]["message"]["content"]
                 return f"**Synthèse du Panel Fusion :**\n{final_synth}"
         except Exception as e:
