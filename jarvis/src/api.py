@@ -87,6 +87,10 @@ class ModelInfo(BaseModel):
     created: int = 0
     owned_by: str = "jarvis"
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 @app.get("/v1/models", dependencies=[Depends(_verify_api_key)])
 async def list_models():
     return {
