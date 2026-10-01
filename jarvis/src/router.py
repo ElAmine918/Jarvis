@@ -27,19 +27,19 @@ async def check_endpoint(url: str, timeout: float = 3.5) -> bool:
 async def get_all_backends() -> list:
     backends = []
     
-    # 1. Priorité absolue : LM Studio (Mac M4)
-    if await check_endpoint(LM_STUDIO_URL, 4.0):
-        backends.append(("LM Studio (Mac)", AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio"), LM_STUDIO_MODEL))
-        
-    # 2. Cloud Gratuit : OpenRouter (Qwen 3.8 27B)
-    if OPENROUTER_API_KEY:
-        backends.append(("OpenRouter (Cloud)", AsyncOpenAI(base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY), OPENROUTER_MODEL))
-
-    # 3. Cloud Fallback : Gemini Flash
+    # 1. Priorité absolue : Cloud Performant (Gemini Flash)
     if GEMINI_API_KEY:
         backends.append(("Gemini Flash (Cloud)", AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY), GEMINI_MODEL))
         
-    # 4. Survie locale : Ollama (Toshiba)
+    # 2. Fallback Cloud : OpenRouter (Qwen 3.8 27B, etc.)
+    if OPENROUTER_API_KEY:
+        backends.append(("OpenRouter (Cloud)", AsyncOpenAI(base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY), OPENROUTER_MODEL))
+
+    # 3. Fallback Local Hautes Performances : LM Studio (Mac M4)
+    if await check_endpoint(LM_STUDIO_URL, 4.0):
+        backends.append(("LM Studio (Mac)", AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio"), LM_STUDIO_MODEL))
+        
+    # 4. Survie locale absolue : Ollama (Toshiba)
     if await check_endpoint(OLLAMA_LOCAL_URL, 2.0):
         # Vérifie quel modèle est réellement dispo dans Ollama
         chosen_model = OLLAMA_LOCAL_MODEL
