@@ -270,6 +270,23 @@ async def cmd_silent(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Erreur /silent: {e}")
         await update.message.reply_text("❌ Une erreur interne s'est produite lors de la requête silencieuse.")
 
+
+async def cmd_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update): return
+    
+    current = context.user_data.get("show_signature", False)
+    context.user_data["show_signature"] = not current
+    new_state = context.user_data["show_signature"]
+    
+    state_str = "ACTIVÉE ✅" if new_state else "DÉSACTIVÉE ❌"
+    msg = f"🪧 **Affichage du modèle** : {state_str}\\n"
+    if new_state:
+        msg += "Le nom du modèle sera discrètement affiché à la fin de mes réponses."
+    else:
+        msg += "Les réponses seront envoyées sans signature."
+        
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
@@ -311,8 +328,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation
-        log_conversation(str(user_id), "telegram", str(user_id), user_text, response, getattr(agent, 'last_backend_used', 'unknown'))
+        backend_used = getattr(agent, 'last_backend_used', 'Inconnu')
+        log_conversation(str(user_id), "telegram", str(user_id), user_text, response, backend_used)
         
+        # Ajout de la signature si activée
+        show_signature = context.user_data.get("show_signature", False)
+        if show_signature:
+            # Rendre ça ultra sobre
+            response += f"\\n\\n_— ⚡️ {backend_used}_"
+            
         # Envoi final du message
         if len(response) < 4000:
             try:
