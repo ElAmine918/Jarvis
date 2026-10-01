@@ -147,17 +147,17 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 1.5)
 
     # Statuts détaillés
-    t1_status = "🟢 En ligne (`qwen/qwen3.5-9b`)" if lm_up else "🔴 Inaccessible (Mac éteint ou hors Tailscale)"
+    t1_status = f"🟢 Configuré (Clé API active : `{GEMINI_MODEL}`)" if GEMINI_API_KEY else "⚪️ Non configuré"
     t2_status = f"🟢 Actif (`{OPENROUTER_MODEL}`)" if OPENROUTER_API_KEY else "⚪️ Non configuré"
-    t3_status = "🟢 Configuré (Clé API active)" if GEMINI_API_KEY else "⚪️ Non configuré"
+    t3_status = "🟢 En ligne (Mac via Tailscale)" if lm_up else "🔴 Inaccessible (Mac éteint ou hors réseau)"
     t4_status = f"🟢 En ligne (`{OLLAMA_LOCAL_MODEL}` - 8 cœurs)" if ollama_up else "🔴 Inaccessible"
 
-    if lm_up:
-        lead = "🍏 *Tier 1 : Mac M4 (LM Studio)* prend la priorité."
+    if GEMINI_API_KEY:
+        lead = "☁️ *Tier 1 : Google Gemini (Cloud Power)* prend la priorité absolue."
     elif OPENROUTER_API_KEY:
-        lead = f"🌐 *Tier 2 : OpenRouter ({OPENROUTER_MODEL})* prend le relais (Mac hors-ligne)."
-    elif GEMINI_API_KEY:
-        lead = "☁️ *Tier 3 : Gemini Flash (Cloud)* prend le relais."
+        lead = f"🌐 *Tier 2 : OpenRouter ({OPENROUTER_MODEL})* prend le relais."
+    elif lm_up:
+        lead = "🍏 *Tier 3 : Mac M4 (LM Studio)* prend le relais en local."
     elif ollama_up:
         lead = "🦙 *Tier 4 : Toshiba (Ollama)* actif en survie locale autonome."
     else:
@@ -166,11 +166,11 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = (
         "🤖 *ARCHITECTURE DES MOTEURS IA*\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"1️⃣ *Tier 1 (Performance - Mac M4)* :\n"
+        f"1️⃣ *Tier 1 (Intelligence Ultime - Gemini)* :\n"
         f"   └ {t1_status}\n\n"
-        f"2️⃣ *Tier 2 (Cloud Gratuit - OpenRouter)* :\n"
+        f"2️⃣ *Tier 2 (Cloud Alternatif - OpenRouter)* :\n"
         f"   └ {t2_status}\n\n"
-        f"3️⃣ *Tier 3 (Cloud Fallback - Google Gemini)* :\n"
+        f"3️⃣ *Tier 3 (Local Puissant - Mac M4)* :\n"
         f"   └ {t3_status}\n\n"
         f"4️⃣ *Tier 4 (Survie Locale - Toshiba Ollama)* :\n"
         f"   └ {t4_status}\n"
