@@ -464,6 +464,7 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(CommandHandler("test_tiers", cmd_test_tiers, block=False))
     app.add_handler(CommandHandler("reset", cmd_reset, block=False))
     app.add_handler(CommandHandler("silent", cmd_silent, block=False))
+    app.add_handler(CommandHandler("show", cmd_show, block=False))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice, block=False))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False))
     app.add_handler(CallbackQueryHandler(handle_callback, block=False))
