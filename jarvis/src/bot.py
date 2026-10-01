@@ -144,35 +144,31 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import time
     
     agent: JarvisAgent = context.bot_data["agent"]
-    
-    # We call get_all_backends locally to see the pool (without history)
     from .router import get_all_backends
     pool = await get_all_backends(history=[])
     
     current_time = time.time()
-    dead_str = ""
-    for m, t in _dead_models.items():
-        if t > current_time:
-            rem = int((t - current_time) / 60)
-            dead_str += f"- {m} (bloqué {rem}m)\\n"
-            
-    if not dead_str:
-        dead_str = "Aucun modèle bloqué."
-        
-    active_str = ""
-    for b in pool:
-        active_str += f"- {b[2]}\\n"
-        
-    if not active_str:
-        active_str = "Aucun modèle disponible."
-
+    
+    # Comptage des modèles bloqués
+    dead_count = sum(1 for t in _dead_models.values() if t > current_time)
+    
+    # Groupement des modèles disponibles
+    gemini = [b[2] for b in pool if "Gemini" in b[0]]
+    openrouter = [b[2] for b in pool if "OpenRouter" in b[0]]
+    local = [b[2] for b in pool if "LM Studio" in b[0] or "Ollama" in b[0]]
+    
+    top_model = pool[0][2] if pool else "Aucun"
+    
     msg = (
-        "🤖 *NEURAL ROUTER STATUS*\\n"
+        "🤖 *NEURAL ROUTER*\\n"
         "━━━━━━━━━━━━━━━━━━━━━\\n"
-        f"*Modèles Disponibles :*\\n{active_str}\\n"
-        f"*Circuit Breaker :*\\n{dead_str}\\n"
+        f"☁️ *Gemini* : {len(gemini)} modèles\\n"
+        f"🌐 *OpenRouter* : {len(openrouter)} modèles\\n"
+        f"🖥️ *Local* : {len(local)} modèles\\n\\n"
+        f"🛡️ *Circuit Breaker* : {dead_count} bloqué(s)\\n"
         "━━━━━━━━━━━━━━━━━━━━━\\n"
-        f"ℹ️ *Dernier modèle utilisé* : `{getattr(agent, 'last_backend_used', 'Inconnu')}`"
+        f"🏆 *Tête de liste* : `{top_model}`\\n"
+        f"ℹ️ *Dernier utilisé* : `{getattr(agent, 'last_backend_used', 'Inconnu')}`"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
