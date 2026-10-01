@@ -196,6 +196,41 @@ async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_test_tiers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+        
+    msg = await update.message.reply_text("⏳ *Test fonctionnel des tiers en cours...*", parse_mode=ParseMode.MARKDOWN)
+    agent: JarvisAgent = context.bot_data["agent"]
+    user_id = update.effective_user.id
+    
+    tiers = [
+        ("Tier 1 (LM Studio)", "jarvis-mac"),
+        ("Tier 2 (OpenRouter)", "jarvis-openrouter"),
+        ("Tier 3 (Gemini)", "jarvis-gemini"),
+        ("Tier 4 (Ollama)", "jarvis-ollama")
+    ]
+    
+    results = []
+    for name, model_id in tiers:
+        try:
+            response = ""
+            async for chunk in agent.process_message([{"role": "user", "content": "Réponds uniquement par 'OK'."}], str(user_id), requested_model=model_id):
+                response += chunk
+            
+            if "❌" in response:
+                # Extraire juste l'erreur courte
+                err = response.replace("❌", "").strip()
+                results.append(f"🔴 *{name}* : Échec ({err})")
+            else:
+                results.append(f"🟢 *{name}* : Succès (Réponse: `{response.strip()}`)")
+        except Exception as e:
+            results.append(f"🔴 *{name}* : Erreur système ({e})")
+            
+    final_text = "📊 *RÉSULTAT DES TESTS FONCTIONNELS*\n━━━━━━━━━━━━━━━━━━━━━\n\n" + "\n\n".join(results)
+    await msg.edit_text(final_text, parse_mode=ParseMode.MARKDOWN)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
@@ -228,41 +263,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        import time
         response = ""
-        # Send initial placeholder
-        msg = await update.message.reply_text("⏳ *Jarvis initialise le traitement...*", parse_mode=ParseMode.MARKDOWN)
-        last_edit_time = time.time()
         
+        # Attendre la réponse complète sans streaming ni message d'initialisation
         async for chunk in agent.process_message(history, str(user_id)):
             response += chunk
-            current_time = time.time()
-            # Update Telegram UI every 1.5 seconds to simulate streaming
-            if current_time - last_edit_time > 1.5 and len(response) > 0 and len(response) < 4000:
-                try:
-                    # Append a cursor for the hacker feel.
-                    await msg.edit_text(response + " █", parse_mode=ParseMode.MARKDOWN)
-                    last_edit_time = current_time
-                except Exception:
-                    pass # Ignore Markdown partial parsing errors or unchanged content
                     
         history.append({"role": "assistant", "content": response})
         
         from .logger_db import log_conversation
         log_conversation(str(user_id), "telegram", str(user_id), user_text, response, getattr(agent, 'last_backend_used', 'unknown'))
         
-        # Final update (without cursor) or split if too long
-        try:
-            if len(response) < 4000:
-                try:
-                    await msg.edit_text(response, parse_mode=ParseMode.MARKDOWN)
-                except Exception:
-                    await msg.edit_text(response) # fallback without markdown
-            else:
-                await msg.delete()
-                await _send_long(update, response)
-        except Exception as e:
-            logger.error(f"Failed to edit final message: {e}")
+        # Envoi final du message
+        if len(response) < 4000:
+            try:
+                await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await update.message.reply_text(response) # fallback without markdown
+        else:
+            await _send_long(update, response)
             
     except Exception as e:
         logger.error(f"Erreur traitement message: {e}", exc_info=True)
@@ -282,6 +301,7 @@ def build_app(agent: JarvisAgent) -> Application:
             BotCommand("status", "📊 Rapport système (CPU, RAM, Disque, Moteur)"),
             BotCommand("backend", "🤖 État des moteurs IA & cascade"),
             BotCommand("skills", "🧠 Compétences et mémoire"),
+            BotCommand("test_tiers", "🧪 Test fonctionnel de chaque moteur IA"),
             BotCommand("help", "💡 Guide et exemples d'utilisation")
         ]
         try:
@@ -297,6 +317,7 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(CommandHandler("status", cmd_status, block=False))
     app.add_handler(CommandHandler("backend", cmd_backend, block=False))
     app.add_handler(CommandHandler("skills", cmd_skills, block=False))
+    app.add_handler(CommandHandler("test_tiers", cmd_test_tiers, block=False))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False))
     app.add_handler(CallbackQueryHandler(handle_callback, block=False))
 
