@@ -33,7 +33,7 @@ async def run_telegram(agent: JarvisAgent):
     await app.initialize()
     await app.start()
     logger.info("✅ Bot Telegram démarré")
-    await app.updater.start_polling(drop_pending_updates=True)
+    await app.updater.start_polling(drop_pending_updates=False)
 
     # Maintenir le bot en vie jusqu'à l'arrêt
     stop_event = asyncio.Event()

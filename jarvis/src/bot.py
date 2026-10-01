@@ -231,6 +231,43 @@ async def cmd_test_tiers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.edit_text(final_text, parse_mode=ParseMode.MARKDOWN)
 
 
+async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+    context.user_data["history"] = []
+    await update.message.reply_text("🧹 *Mémoire effacée.* Le contexte de notre conversation a été réinitialisé.", parse_mode=ParseMode.MARKDOWN)
+
+async def cmd_silent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+        
+    user_text = update.message.text.replace("/silent", "", 1).strip()
+    if not user_text:
+        await update.message.reply_text("⚠️ Ajoute ta demande après la commande, ex: `/silent Quelle est la capitale ?`", parse_mode=ParseMode.MARKDOWN)
+        return
+        
+    user_id = update.effective_user.id
+    agent: JarvisAgent = context.bot_data["agent"]
+    
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    try:
+        response = ""
+        # On passe uniquement ce message, avec un faux ID pour ne pas polluer les logs standards si possible
+        async for chunk in agent.process_message([{"role": "user", "content": user_text}], session_id=f"silent_{user_id}"):
+            response += chunk
+            
+        if len(response) < 4000:
+            try:
+                await update.message.reply_text(f"👻 *Réponse éphémère :*\n\n{response}", parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await update.message.reply_text(f"👻 Réponse éphémère :\n\n{response}")
+        else:
+            await _send_long(update, response)
+    except Exception as e:
+        logger.error(f"Erreur /silent: {e}")
+        await update.message.reply_text("❌ Une erreur interne s'est produite lors de la requête silencieuse.")
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
@@ -302,12 +339,22 @@ def build_app(agent: JarvisAgent) -> Application:
             BotCommand("backend", "🤖 État des moteurs IA & cascade"),
             BotCommand("skills", "🧠 Compétences et mémoire"),
             BotCommand("test_tiers", "🧪 Test fonctionnel de chaque moteur IA"),
+            BotCommand("reset", "🧹 Effacer l'historique de la conversation"),
+            BotCommand("silent", "👻 Poser une question éphémère sans contexte"),
             BotCommand("help", "💡 Guide et exemples d'utilisation")
         ]
         try:
             await application.bot.set_my_commands(commands)
         except Exception as e:
             logger.warning(f"Impossible d'enregistrer les commandes Telegram: {e}")
+            
+        import os
+        allowed = [uid.strip() for uid in os.getenv("ALLOWED_TELEGRAM_USER_IDS", "").split(",") if uid.strip()]
+        for uid in allowed:
+            try:
+                await application.bot.send_message(chat_id=uid, text="🔌 *Système en ligne.* Jarvis est réveillé et prêt. Les messages en attente vont être traités.", parse_mode="Markdown")
+            except Exception:
+                pass
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     app.bot_data["agent"] = agent
@@ -318,6 +365,8 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(CommandHandler("backend", cmd_backend, block=False))
     app.add_handler(CommandHandler("skills", cmd_skills, block=False))
     app.add_handler(CommandHandler("test_tiers", cmd_test_tiers, block=False))
+    app.add_handler(CommandHandler("reset", cmd_reset, block=False))
+    app.add_handler(CommandHandler("silent", cmd_silent, block=False))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False))
     app.add_handler(CallbackQueryHandler(handle_callback, block=False))
 
