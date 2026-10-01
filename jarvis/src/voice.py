@@ -25,9 +25,9 @@ async def transcribe_voice(file_bytes: bytes) -> str:
                 async with httpx.AsyncClient() as client:
                     with open(temp_path, "rb") as audio_file:
                         res = await client.post(
-                            f"{LOCAL_STT_URL}/inference",
-                            files={"file": audio_file},
-                            data={"response_format": "text"},
+                            f"{LOCAL_STT_URL}/asr",
+                            files={"audio_file": audio_file},
+                            data={"output": "txt", "encode": "true", "task": "transcribe"},
                             timeout=30.0
                         )
                     if res.status_code == 200:

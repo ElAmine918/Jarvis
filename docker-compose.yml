@@ -223,3 +223,23 @@ networks:
   docker-proxy-net:
     name: docker-proxy-net
     internal: true   # pas de sortie Internet depuis ce réseau
+
+  # ─── Whisper (Local Speech-to-Text) ──────────────────────────────────────
+  whisper:
+    image: ahmetoner/whisper-asr-webservice:latest
+    container_name: whisper
+    restart: unless-stopped
+    environment:
+      - ASR_MODEL=tiny
+      - ASR_ENGINE=openai_whisper
+    networks:
+      - jarvis-net
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - "jarvis.manageable=false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
