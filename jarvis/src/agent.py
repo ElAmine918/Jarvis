@@ -43,8 +43,8 @@ class JarvisAgent:
             })
         return tools
 
-    async def _get_backends_for_model(self, requested_model: str):
-        all_backends = await get_all_backends()
+    async def _get_backends_for_model(self, requested_model: str, history: list = None):
+        all_backends = await get_all_backends(history)
         if not all_backends:
             return []
         if requested_model == "jarvis-gemini":
@@ -91,14 +91,14 @@ class JarvisAgent:
 
 
     async def process_message(self, open_webui_messages: List[Dict[str, Any]], session_id: str = 'default', requested_model: str = "jarvis-auto") -> AsyncGenerator[str, None]:
-        backends = await self._get_backends_for_model(requested_model)
-        if not backends:
-            yield f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
-            return
-
         history = self._prepare_history(open_webui_messages, session_id)
         
         if len(history) == 1:
+            return
+
+        backends = await self._get_backends_for_model(requested_model, history)
+        if not backends:
+            yield f"❌ Le backend sélectionné ({requested_model}) n'est pas en ligne."
             return
 
         tools = self._build_tools_openai_format()
@@ -175,10 +175,8 @@ class JarvisAgent:
                 except Exception as e:
                     logger.warning(f"Backend stream {b_name} a échoué: {e}")
                     error_str = str(e)
-                    # Si c'est une limite de quota stricte ou un modèle introuvable, on le bannit pour 24h
-                    if "429" in error_str or "Quota exceeded" in error_str or "404" in error_str:
-                        from .router import mark_model_dead
-                        mark_model_dead(model, duration_seconds=86400)
+                    from .router import mark_model_dead
+                    mark_model_dead(model, error_str)
                     continue
             
             if not success_backend:
