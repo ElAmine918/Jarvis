@@ -10,3 +10,7 @@ textual
 edge-tts
 proxmoxer
 requests
+mcp
+livekit-agents
+livekit-plugins-openai
+livekit-plugins-silero
