@@ -23,6 +23,7 @@ DASHBOARD_HTML = """
     <title>JARVIS OS - Neural Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -331,7 +332,7 @@ DASHBOARD_HTML = """
                                         <span class="text-[10px] text-purple-400 font-mono uppercase tracking-wider font-bold">JARVIS CORE</span>
                                         <span class="text-[9px] px-1.5 py-0.5 bg-black rounded border border-slate-700 text-slate-500 font-mono">{{ c.model_used }}</span>
                                     </div>
-                                    <div class="whitespace-pre-wrap leading-relaxed">{{ truncateText(c.message_out, 400) }}</div>
+                                    <div class="prose prose-invert prose-sm max-w-none leading-relaxed" v-html="renderMarkdown(c.message_out)"></div>
                                 </div>
                             </div>
                         </div>
@@ -360,6 +361,7 @@ DASHBOARD_HTML = """
                 }
             },
             mounted() {
+                marked.setOptions({ breaks: true });
                 this.fetchData()
                 setInterval(this.fetchData, 2000) // Fast polling for snappy UI
                 setInterval(this.updateUptime, 1000)
@@ -398,8 +400,9 @@ DASHBOARD_HTML = """
                 },
                 formatDate(ts) {
                     if (!ts) return ''
-                    const d = new Date(ts)
-                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + String(d.getMilliseconds()).padStart(3, '0')
+                    // SQLite records in UTC, we append 'Z' so Javascript parses it correctly to the user's local timezone.
+                    const d = new Date(ts.replace(' ', 'T') + 'Z')
+                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 },
                 formatJson(str, inline = false) {
                     try {
@@ -412,10 +415,9 @@ DASHBOARD_HTML = """
                 formatNumber(num) {
                     return num.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ",");
                 },
-                truncateText(text, length) {
+                renderMarkdown(text) {
                     if (!text) return "";
-                    if (text.length <= length) return text;
-                    return text.substring(0, length) + "... [DATA TRUNCATED]";
+                    return marked.parse(text);
                 }
             }
         }).mount('#app')
