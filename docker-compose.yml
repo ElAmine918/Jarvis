@@ -204,6 +204,27 @@ services:
         max-size: "5m"
         max-file: "2"
 
+  # ─── Jarvis Live Agent (WebRTC) ─────────────────────────────────────────
+  jarvis-live:
+    build:
+      context: ./jarvis
+      dockerfile: Dockerfile
+    container_name: jarvis-live
+    restart: unless-stopped
+    env_file: .env
+    command: python3 src/live_agent.py start
+    networks:
+      - jarvis-net
+    depends_on:
+      - docker-proxy
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 volumes:
   jarvis-data:
   jarvis-workspace:
