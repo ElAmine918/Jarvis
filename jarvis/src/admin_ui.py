@@ -440,9 +440,11 @@ DASHBOARD_HTML = """
 security = HTTPBasic()
 
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
-    # Fallback to "jarvis" if ADMIN_PASSWORD is not set in .env
+    if not ADMIN_PASSWORD:
+        return credentials # Mode developpement
+        
     correct_username = secrets.compare_digest(credentials.username, "admin")
-    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD if ADMIN_PASSWORD else "jarvis")
+    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
     if not (correct_username and correct_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

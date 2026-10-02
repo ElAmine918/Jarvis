@@ -92,7 +92,7 @@ services:
       OPENAI_API_KEY: "${JARVIS_API_KEY}"  # H-06 : utiliser la même clé API Jarvis
       ENABLE_OLLAMA_API: "false"
       WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY}"  # H-06 : clé secrète depuis .env (plus de valeur en dur)
-      WEBUI_AUTH: "true"  # H-06 : activer l'authentification Open WebUI
+      WEBUI_AUTH: "false"  # Désactivé pour le développement local
     ports:
       - "3000:8080"
     volumes:
