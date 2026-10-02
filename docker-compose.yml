@@ -213,6 +213,8 @@ services:
     restart: unless-stopped
     env_file: .env
     command: python3 src/live_agent.py start
+    healthcheck:
+      disable: true
     networks:
       - jarvis-net
     depends_on:
