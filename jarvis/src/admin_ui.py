@@ -132,7 +132,7 @@ DASHBOARD_HTML = """
                 </div>
                 <div class="flex flex-col items-end">
                     <span class="text-slate-500 text-xs uppercase tracking-widest">Active Tools</span>
-                    <span class="text-blue-400">11 Modules</span>
+                    <span class="text-blue-400">{{ toolsCount }} Modules</span>
                 </div>
             </div>
         </header>
@@ -350,6 +350,7 @@ DASHBOARD_HTML = """
         createApp({
             data() {
                 return {
+                    toolsCount: 0,
                     loading: false,
                     conversations: [],
                     actions: [],
@@ -372,11 +373,16 @@ DASHBOARD_HTML = """
                 this.savings = (this.syntheticTokens / 1000 * 0.02).toFixed(2);
             },
             methods: {
+                truncateText(text, length) {
+                    if (!text) return "";
+                    return text.length > length ? text.substring(0, length) + '...' : text;
+                },
                 async fetchData() {
                     try {
                         const res = await fetch('/admin/api/data')
                         const data = await res.json()
                         this.conversations = data.conversations
+                        this.toolsCount = data.tools_count
                         
                         // Detect new actions to auto-scroll terminal
                         const oldLength = this.actions.length;
@@ -468,6 +474,7 @@ async def admin_api_data(_=Depends(verify_admin)):
     ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 0.5)
     
     return {
+        "tools_count": len(get_default_registry().get_all_tools()),
         "conversations": convs,
         "actions": acts,
         "backends": {
