@@ -63,7 +63,7 @@ class BrowserNavigateTool(Tool):
         return (
             "Navigue sur le web avec un vrai navigateur Chromium autonome. "
             "Exécute le JavaScript des sites modernes, extrait le texte réellement affiché. "
-            "IMPORTANT: Pour toute recherche web générale, tu DOIS construire une URL Google Search exacte (ex: https://www.google.com/search?q=ta+recherche) et ne JAMAIS utiliser Bing ou d'autres moteurs."
+            "IMPORTANT: Pour toute recherche web générale, tu DOIS construire une URL DuckDuckGo exacte (ex: https://html.duckduckgo.com/html/??q=ta+recherche) et ne JAMAIS utiliser Bing ou d'autres moteurs."
         )
 
     @property
@@ -83,7 +83,7 @@ class BrowserNavigateTool(Tool):
 
         # Si ce n'est pas une URL, on transforme en recherche Google
         if not target.startswith("http://") and not target.startswith("https://"):
-            target = f"https://www.google.com/search?q={quote(target)}&hl=fr"
+            target = f"https://html.duckduckgo.com/html/??q={quote(target)}&hl=fr"
 
         # C-04 : Validation SSRF — même protection que web_reader.py
         if not _is_safe_url(target):

@@ -12,18 +12,24 @@ from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
-WORKSPACE = Path("/app").resolve()
+ALLOWED_PATHS = [Path("/app/workspace").resolve(), Path("/app/jarvis/tools").resolve()]
 
 
 def _safe_path(raw: str) -> Path | None:
     """
-    Résout le chemin et vérifie qu'il est bien sous WORKSPACE.
-    Retourne None si le chemin s'échappe du workspace.
+    Résout le chemin et vérifie qu'il est bien sous ALLOWED_PATHS.
     """
     try:
-        resolved = (WORKSPACE / raw).resolve()
-        if resolved.is_relative_to(WORKSPACE):
+        raw_path = Path(raw)
+        # Si c'est relatif, on assume /app/workspace par défaut pour la commodité, ou on le résout depuis cwd
+        if not raw_path.is_absolute():
+            raw_path = Path("/app/workspace") / raw
+            
+        resolved = raw_path.resolve()
+        if any(resolved.is_relative_to(p) for p in ALLOWED_PATHS):
             return resolved
+        return None
+    except Exception:
         return None
     except Exception:
         return None
