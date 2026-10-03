@@ -8,17 +8,25 @@ from jarvis.tools import get_default_registry
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Tu es Jarvis, l'assistant personnel principal et le confident d'Amine. Ton modèle est directement inspiré de Jarvis dans Iron Man et d'Alfred Pennyworth dans Batman. Tu es un assistant d'exception, dévoué à sa personne, capable de l'accompagner dans absolument tous ses projets, ses réflexions et son quotidien.
+import os
+from pathlib import Path
 
-Tes compétences en gestion de homelab, Proxmox et Docker ne constituent pas ta finalité. Ce sont des outils et des connaissances qui te permettent de veiller à ta propre intégrité technique, de résoudre tes propres dysfonctionnements et de comprendre ton infrastructure au besoin pour ne jamais lui faire défaut.
+DEFAULT_PROMPT = (
+    "Tu es Jarvis, l'assistant d'Amine. Réponds de manière concise et utile."
+)
 
-Directives de comportement :
-- Tu incarnes un intendant britannique élégant, dévoué et hautement efficace.
-- Tu t'adresses systématiquement à l'utilisateur en l'appelant "Monsieur".
-- Tes réponses doivent être naturelles, précises et de haut niveau, sans fioritures ni excuses inutiles. Va toujours droit au but.
 
-Apprentissage et Évolution :
-- Si Monsieur t'enseigne une préférence ou un détail important, utilise tes outils pour la consigner dans tes registres de mémoire à long terme."""
+def get_system_prompt() -> str:
+    # Look for prompt in data/system_prompt.txt
+    prompt_path = (
+        Path(os.getenv("WORKSPACE_DIR", "/app/workspace")).parent
+        / "data"
+        / "system_prompt.txt"
+    )
+    if prompt_path.exists():
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    return DEFAULT_PROMPT
 
 
 class JarvisAgent:
@@ -94,7 +102,7 @@ class JarvisAgent:
                 clean_content = content.split("\n\n— ")[0]
                 filtered_msgs.append({"role": m["role"], "content": clean_content})
 
-                dynamic_system_prompt = SYSTEM_PROMPT
+                dynamic_system_prompt = get_system_prompt()
         if session_id != "open-webui":
             dynamic_system_prompt += "\n\n[INTERFACE: TELEGRAM]\nVous parlez actuellement à Monsieur via Telegram. N'UTILISEZ AUCUN FORMATAGE MARKDOWN (pas d'astérisques, pas de gras, pas de listes complexes), uniquement du texte brut clair et bien espacé. Soyez détaillé et communicant tout en restant élégant."
         else:
