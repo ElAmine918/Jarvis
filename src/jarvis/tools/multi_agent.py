@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_api_headers():
-    return {"Authorization": f"Bearer {os.getenv('JARVIS_API_KEY', '')}"}
+    token = os.getenv("JARVIS_API_KEY", "").strip()
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 class SubagentTool(Tool):

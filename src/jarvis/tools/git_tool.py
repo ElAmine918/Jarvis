@@ -43,11 +43,11 @@ class GitTool(Tool):
         from jarvis.filesystem import _safe_path
 
         command = kwargs.get("command")
-        working_dir = kwargs.get("working_dir", "/app/workspace")
+        working_dir = kwargs.get("working_dir", "/app")
 
         safe_dir = _safe_path(working_dir)
         if safe_dir is None or not safe_dir.is_dir():
-            return f"🚫 Sécurité: Le dossier '{working_dir}' est interdit ou invalide. Opérations Git limitées à /app/workspace."
+            return f"🚫 Sécurité: Le dossier '{working_dir}' est interdit ou invalide. Opérations Git limitées à /app."
 
         if not command.startswith("git "):
             return "❌ Erreur : La commande doit commencer par 'git '."

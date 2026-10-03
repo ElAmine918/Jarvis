@@ -12,7 +12,7 @@ from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
-WORKSPACE = Path("/app/workspace").resolve()
+WORKSPACE = Path("/app").resolve()
 
 
 def _safe_path(raw: str) -> Path | None:
@@ -30,7 +30,7 @@ def _safe_path(raw: str) -> Path | None:
 
 
 class FileSystemTool(Tool):
-    """Opérations sur les fichiers, limitées au workspace /app/workspace."""
+    """Opérations sur les fichiers, limitées au répertoire principal /app."""
 
     @property
     def name(self) -> str:
@@ -39,7 +39,7 @@ class FileSystemTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Lit, écrit, liste et crée des fichiers/dossiers dans /app/workspace. "
+            "Lit, écrit, liste et crée des fichiers/dossiers dans /app. "
             "Toutes les actions sont strictement limitées au workspace. "
             "Aucun shell — pas de commandes arbitraires."
         )
@@ -55,7 +55,7 @@ class FileSystemTool(Tool):
                 },
                 "path": {
                     "type": "string",
-                    "description": "Chemin relatif par rapport à /app/workspace.",
+                    "description": "Chemin relatif par rapport à /app.",
                 },
                 "content": {
                     "type": "string",

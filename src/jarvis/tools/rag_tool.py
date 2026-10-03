@@ -46,7 +46,7 @@ class DocumentRAGTool(Tool):
         # Security: Valider le chemin via le sandbox filesystem avant toute lecture
         safe = _safe_path(file_path)
         if safe is None:
-            return "🚫 Sécurité : chemin interdit. Le RAG est limité au répertoire /app/workspace."
+            return "🚫 Sécurité : chemin interdit. Le RAG est limité au répertoire /app."
 
         if not safe.exists():
             return f"❌ Le fichier {file_path} n'existe pas."

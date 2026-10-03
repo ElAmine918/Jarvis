@@ -48,7 +48,7 @@ services:
     volumes:
     - jarvis-data:/app/data
     - jarvis-workspace:/app/workspace
-    - ./src/jarvis:/app/jarvis:ro
+    - ./src/jarvis:/app/jarvis:rw
     networks:
     - jarvis-net
     - docker-proxy-net

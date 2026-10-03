@@ -26,12 +26,12 @@ class TestFilesystemSecurity:
     def test_dotdot_blocked(self):
         assert _safe_path("../../etc/passwd") is None
 
-    def test_absolute_outside_workspace_blocked(self):
+    def test_absolute_outside_app_blocked(self):
         resolved = _safe_path("/etc/passwd")
         if resolved is not None:
             assert resolved.is_relative_to(WORKSPACE)
 
-    def test_workspace_path_allowed(self):
+    def test_app_path_allowed(self):
         assert _safe_path("test.txt").is_relative_to(WORKSPACE)
 
     @pytest.mark.asyncio

@@ -48,7 +48,7 @@ class ApplyPatchTool(Tool):
 
         safe = _safe_path(file_path)
         if safe is None:
-            return f"🚫 Sécurité: Le chemin '{file_path}' est interdit. Vous ne pouvez patcher que des fichiers dans /app/workspace."
+            return f"🚫 Sécurité: Le chemin '{file_path}' est interdit. Vous ne pouvez patcher que des fichiers dans /app."
 
         try:
             with open(safe, "r") as f:
