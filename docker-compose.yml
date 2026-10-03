@@ -1,22 +1,14 @@
 services:
-
-  # ─── Proxy Docker sécurisé ──────────────────────────────────────────────
-  # Seul ce conteneur a accès au vrai socket Docker.
-  # Il expose une API filtrée à Jarvis : uniquement les endpoints autorisés.
-  # Jarvis ne peut JAMAIS voir le socket brut.
   docker-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: docker-proxy
     restart: unless-stopped
     environment:
-      # Lecture seule autorisée
-      CONTAINERS: 1   # lister, inspecter
-      IMAGES: 0       # interdit
-      NETWORKS: 0     # interdit
-      VOLUMES: 0      # interdit
-      # Actions autorisées sur les conteneurs
-      POST: 1         # nécessaire pour start/stop/restart
-      # Tout le reste est interdit par défaut (EXEC, BUILD, etc.)
+      CONTAINERS: 1
+      IMAGES: 0
+      NETWORKS: 0
+      VOLUMES: 0
+      POST: 1
       EXEC: 0
       BUILD: 0
       COMMIT: 0
@@ -31,53 +23,17 @@ services:
       SYSTEM: 0
       TASKS: 0
       SECRETS: 0
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - docker-proxy-net
-    # Ce conteneur ne parle pas au réseau principal
+    - docker-proxy-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Jarvis Agent ────────────────────────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   jarvis:
     build:
       context: ./jarvis
@@ -86,324 +42,143 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Jarvis parle au proxy, PAS au vrai socket
-      DOCKER_HOST: "tcp://docker-proxy:2375"
+      DOCKER_HOST: tcp://docker-proxy:2375
     ports:
-      - "8080:8080"
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
+    - 8080:8080
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - jarvis-data:/app/data
+    - jarvis-workspace:/app/workspace
+    - ./jarvis/src:/app/src:ro
     networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - jarvis-data:/app/data
-  jarvis-db-data:
-      - jarvis-workspace:/app/workspace
-      - ./jarvis/src:/app/src:ro
-      # PAS de /var/run/docker.sock ici — c'est le proxy qui gère
-    networks:
-      - jarvis-net
-      - docker-proxy-net
+    - jarvis-net
+    - docker-proxy-net
     depends_on:
-      - docker-proxy
+    - docker-proxy
     security_opt:
-      - no-new-privileges:true   # interdit l'escalade de privilèges
+    - no-new-privileges:true
     cap_drop:
-      - ALL                      # retire TOUTES les capabilities Linux
+    - ALL
     cap_add:
-      - SETUID                   # nécessaire pour l'utilisateur jarvis
-      - SETGID
+    - SETUID
+    - SETGID
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ─── Open WebUI ──────────────────────────────────────────────────────────
+        max-size: 10m
+        max-file: '3'
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
     restart: unless-stopped
     environment:
-      OPENAI_API_BASE_URL: "http://jarvis:8080/v1"
-      OPENAI_API_KEY: "${JARVIS_API_KEY}"  # H-06 : utiliser la même clé API Jarvis
-      ENABLE_OLLAMA_API: "false"
-      WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY}"  # H-06 : clé secrète depuis .env (plus de valeur en dur)
-      WEBUI_AUTH: "false"  # Désactivé pour le développement local
+      OPENAI_API_BASE_URL: http://jarvis:8080/v1
+      OPENAI_API_KEY: ${JARVIS_API_KEY}
+      ENABLE_OLLAMA_API: 'false'
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      WEBUI_AUTH: 'false'
     ports:
-      - "3000:8080"
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
+    - 3000:8080
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-    networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - open-webui-data:/app/backend/data
+    - open-webui-data:/app/backend/data
     depends_on:
-      - jarvis
+    - jarvis
     networks:
-      - jarvis-net
+    - jarvis-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Caddy Reverse Proxy ─────────────────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   caddy:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
+    - 80:80
+    - 443:443
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    - caddy-data:/data
+    - caddy-config:/config
     networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    networks:
-      - jarvis-net
-      - projects-net
+    - jarvis-net
+    - projects-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Ollama (SLM local) ───────────────────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     restart: unless-stopped
     environment:
-      OLLAMA_KEEP_ALIVE: "5m"
+      OLLAMA_KEEP_ALIVE: 5m
       OLLAMA_NUM_PARALLEL: 1
       OLLAMA_NUM_THREADS: 8
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - ollama-data:/root/.ollama
     networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - ollama-data:/root/.ollama
-    networks:
-      - jarvis-net
+    - jarvis-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Chromium Headless Browser ──────────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   chromium:
     image: ghcr.io/browserless/chromium:latest
     container_name: chromium
     restart: unless-stopped
     environment:
-      - CONCURRENT=5
-      - QUEUE=5
-      - TIMEOUT=30000
+    - CONCURRENT=5
+    - QUEUE=5
+    - TIMEOUT=30000
     networks:
-      - jarvis-net
+    - jarvis-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Portainer CE (Dashboard Docker Web) ─────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
     restart: unless-stopped
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     ports:
-      # H-09 : uniquement HTTPS — le port HTTP 9000 est retiré pour éviter le trafic en clair
-      - "9443:9443"
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
-  pgvector:
-    image: pgvector/pgvector:pg16
-    container_name: jarvis-pgvector
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: jarvis
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-jarvis_secret}
-      POSTGRES_DB: jarvis_memory
-    shm_size: 256mb
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
+    - 9443:9443
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - /etc/localtime:/etc/localtime:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - portainer-data:/data
     networks:
-      - jarvis-net
-    deploy:
-      resources:
-        limits:
-          memory: 1G
+    - jarvis-net
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer-data:/data
-    networks:
-      - jarvis-net
-    labels:
-      - "jarvis.manageable=false"
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Jarvis Live Agent (WebRTC) ─────────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   jarvis-live:
     build:
       context: ./jarvis
@@ -415,38 +190,34 @@ services:
     healthcheck:
       disable: true
     networks:
-      - jarvis-net
+    - jarvis-net
     depends_on:
-      - docker-proxy
+    - docker-proxy
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Whisper (Local Speech-to-Text) ──────────────────────────────────────
+        max-size: 5m
+        max-file: '2'
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
     container_name: whisper
     restart: unless-stopped
     environment:
-      - ASR_MODEL=tiny
-      - ASR_ENGINE=openai_whisper
+    - ASR_MODEL=tiny
+    - ASR_ENGINE=openai_whisper
     networks:
-      - jarvis-net
+    - jarvis-net
     security_opt:
-      - no-new-privileges:true
+    - no-new-privileges:true
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
-  # ─── Jarvis Memory DB (Postgres + pgvector) ─────────────────────────
+        max-size: 5m
+        max-file: '2'
   pgvector:
     image: pgvector/pgvector:pg16
     container_name: jarvis-pgvector
@@ -457,46 +228,41 @@ services:
       POSTGRES_DB: jarvis_memory
     shm_size: 256mb
     command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "maintenance_work_mem=256MB"
+    - postgres
+    - -c
+    - shared_buffers=256MB
+    - -c
+    - maintenance_work_mem=256MB
     volumes:
-      - jarvis-db-data:/var/lib/postgresql/data
-      - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - jarvis-db-data:/var/lib/postgresql/data
+    - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     networks:
-      - jarvis-net
+    - jarvis-net
     deploy:
       resources:
         limits:
           memory: 1G
     labels:
-      - "jarvis.manageable=false"
+    - jarvis.manageable=false
     logging:
       driver: json-file
       options:
-        max-size: "5m"
-        max-file: "2"
-
+        max-size: 5m
+        max-file: '2'
 volumes:
-  jarvis-data:
-  jarvis-db-data:
-  jarvis-workspace:
-  open-webui-data:
-  caddy-data:
-  caddy-config:
-  ollama-data:
-  portainer-data:
-
+  jarvis-data: null
+  jarvis-workspace: null
+  open-webui-data: null
+  caddy-data: null
+  caddy-config: null
+  ollama-data: null
+  portainer-data: null
+  jarvis-db-data: null
 networks:
   jarvis-net:
     name: jarvis-net
   projects-net:
     name: projects-net
-  # Réseau isolé uniquement pour Jarvis <-> docker-proxy
-  # Aucun autre conteneur n'y a accès
   docker-proxy-net:
     name: docker-proxy-net
-    internal: true   # pas de sortie Internet depuis ce réseau
-
+    internal: true
