@@ -40,7 +40,7 @@ class GitTool(Tool):
     async def execute(self, **kwargs) -> str:
         import shlex
 
-        from jarvis.filesystem import _safe_path
+        from jarvis.tools.filesystem import _safe_path
 
         command = kwargs.get("command")
         working_dir = kwargs.get("working_dir", "/app")

@@ -137,7 +137,7 @@ class JarvisAgent:
             current_model = ""
             success_backend = False
 
-                        if iteration == 10:
+            if iteration == 10:
                 history.append({
                     "role": "system",
                     "content": "⚠️ AVERTISSEMENT INTERNE : Tu as utilisé 10 itérations pour cette tâche. Tu sembles bloqué ou tourner en boucle. Arrête immédiatement d'essayer la même stratégie. Utilise l'outil `consult_advisor` pour demander de l'aide à l'Agent Superviseur, ou arrête l'exécution et explique le problème à l'utilisateur."

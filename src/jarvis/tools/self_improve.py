@@ -3,7 +3,6 @@ import logging
 import os
 from typing import Any
 
-from jarvis.core.agent import JarvisAgent
 from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
@@ -41,6 +40,7 @@ class SelfImproveTool(Tool):
         target_path = f"/app/jarvis/tools/{tool_name}.py"
         
         # --- ÉTAPE 1 : AUDIT ISOLÉ (L'INSPECTEUR) ---
+        from jarvis.core.agent import JarvisAgent
         auditor = JarvisAgent()
         # On crée un historique vierge pour l'auditeur pour garantir l'isolation
         audit_history = [
