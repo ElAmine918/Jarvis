@@ -4,6 +4,7 @@ import datetime
 import random
 
 import secrets
+from .tools import get_default_registry
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse
