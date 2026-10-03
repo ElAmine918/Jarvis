@@ -347,7 +347,13 @@ DASHBOARD_HTML = """
     <script>
         const { createApp } = Vue
 
-        createApp({
+        
+        window.onerror = function(msg, src, lineno, colno, error) {
+            document.getElementById('error-overlay').style.display = 'block';
+            document.getElementById('error-message').innerText += '\n' + msg + '\n' + (error ? error.stack : '');
+        };
+        const app = createApp({
+
             data() {
                 return {
                     toolsCount: 0,
@@ -427,7 +433,15 @@ DASHBOARD_HTML = """
                     return marked.parse(text);
                 }
             }
-        }).mount('#app')
+        })
+
+        app.config.errorHandler = function(err, vm, info) {
+            document.getElementById('error-overlay').style.display = 'block';
+            document.getElementById('error-message').innerText += '\nVue Error: ' + err.toString() + '\nInfo: ' + info + '\nStack: ' + err.stack;
+            console.error(err);
+        };
+        app.mount('#app')
+
     </script>
     <style>
         .animate-fade-in {
