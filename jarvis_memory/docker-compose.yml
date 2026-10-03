@@ -1,0 +1,24 @@
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16-v0.8.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-testpass}
+      POSTGRES_DB: jarvis_memory
+    shm_size: 256mb
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "maintenance_work_mem=256MB"]
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    networks:
+      - db_net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+networks:
+  db_net:
+    name: ${JARVIS_NETWORK:-jarvis_api_net}
+    external: false

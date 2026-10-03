@@ -1,0 +1,135 @@
+import sqlite3
+import datetime
+import os
+import logging
+from typing import Dict, Any
+
+from .base import Tool
+
+try:
+    from ..logger_db import DB_PATH
+except ImportError:
+    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'data', 'logs.db')
+
+logger = logging.getLogger(__name__)
+
+class MemoryRecallTool(Tool):
+    @property
+    def name(self) -> str:
+        return "memory_recall"
+
+    @property
+    def description(self) -> str:
+        return "Permet à Jarvis de rechercher dans son propre historique (conversations, actions des outils, statistiques d'utilisation des tokens) dans la base de données locale logs.db."
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "query_type": {
+                    "type": "string",
+                    "enum": ["conversations", "actions", "token_stats", "search"],
+                    "description": "Le type de requête : 'conversations' (dernières discussions), 'actions' (derniers outils utilisés), 'token_stats' (statistiques d'utilisation), 'search' (recherche par mot-clé)."
+                },
+                "keyword": {
+                    "type": "string",
+                    "description": "Le mot-clé pour la recherche (utilisé uniquement si query_type est 'search')."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Le nombre maximum de résultats à retourner (défaut 10, max 50)."
+                },
+                "days": {
+                    "type": "integer",
+                    "description": "Le nombre de jours dans le passé à inclure (défaut 7)."
+                }
+            },
+            "required": ["query_type"]
+        }
+
+    async def execute(self, **kwargs) -> str:
+        query_type = kwargs.get("query_type")
+        keyword = kwargs.get("keyword", "")
+        limit = min(kwargs.get("limit", 10), 50)
+        days = kwargs.get("days", 7)
+
+        if not os.path.exists(DB_PATH):
+            return "Erreur : La base de données des logs est introuvable."
+
+        cutoff_date = (datetime.datetime.now() - datetime.timedelta(days=days)).isoformat()
+        
+        try:
+            # Exécution de la requête de façon synchrone comme demandé
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            
+            result_text = f"Résultats de la mémoire pour '{query_type}' (Limité à {limit}, depuis {days} jours) :\n"
+            
+            if query_type == "conversations":
+                cursor.execute(
+                    "SELECT timestamp, message_in, message_out FROM conversations WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?", 
+                    (cutoff_date, limit)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    result_text += "- Aucune conversation trouvée."
+                for row in rows:
+                    msg_in = str(row[1])[:100] + "..." if len(str(row[1])) > 100 else str(row[1])
+                    msg_out = str(row[2])[:100] + "..." if len(str(row[2])) > 100 else str(row[2])
+                    result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+
+            elif query_type == "actions":
+                cursor.execute(
+                    "SELECT timestamp, tool_name, arguments FROM actions WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT ?", 
+                    (cutoff_date, limit)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    result_text += "- Aucune action trouvée."
+                for row in rows:
+                    args = str(row[2])[:100] + "..." if len(str(row[2])) > 100 else str(row[2])
+                    result_text += f"\n- [{row[0]}] Outil: {row[1]} | Args: {args}"
+
+            elif query_type == "token_stats":
+                cursor.execute(
+                    "SELECT model_name, SUM(tokens) FROM token_usage WHERE timestamp >= ? GROUP BY model_name ORDER BY SUM(tokens) DESC", 
+                    (cutoff_date,)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    result_text += "- Aucune donnée d'utilisation des tokens."
+                for row in rows:
+                    result_text += f"\n- Modèle: {row[0]} | Tokens totaux: {row[1]}"
+
+            elif query_type == "search":
+                if not keyword:
+                    return "Erreur : Le mot-clé est requis pour le type de recherche 'search'."
+                
+                search_term = f"%{keyword}%"
+                cursor.execute(
+                    "SELECT timestamp, message_in, message_out FROM conversations WHERE timestamp >= ? AND (message_in LIKE ? OR message_out LIKE ?) ORDER BY timestamp DESC LIMIT ?", 
+                    (cutoff_date, search_term, search_term, limit)
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    result_text += f"- Aucun résultat trouvé pour '{keyword}'."
+                for row in rows:
+                    msg_in = str(row[1])[:100] + "..." if len(str(row[1])) > 100 else str(row[1])
+                    msg_out = str(row[2])[:100] + "..." if len(str(row[2])) > 100 else str(row[2])
+                    result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+            
+            else:
+                return f"Erreur : Type de requête '{query_type}' non reconnu."
+            
+            conn.close()
+            
+            # Truncate to max 3000 chars to avoid blowing up context
+            if len(result_text) > 3000:
+                return result_text[:2997] + "..."
+            
+            return result_text
+
+        except Exception as e:
+            logger.error(f"Erreur lors de la lecture de la mémoire: {str(e)}")
+            return f"Erreur lors de l'accès à la base de données : {str(e)}"
