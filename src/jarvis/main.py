@@ -12,9 +12,9 @@ import sys
 import uvicorn
 
 from jarvis.core.agent import JarvisAgent
+from jarvis.core.config import API_HOST, API_PORT, LOG_LEVEL, TELEGRAM_BOT_TOKEN
 from jarvis.interfaces.api import app as fastapi_app
 from jarvis.interfaces.bot import build_app as build_telegram_app
-from jarvis.core.config import API_HOST, API_PORT, LOG_LEVEL, TELEGRAM_BOT_TOKEN
 
 # Configuration du logging
 logging.basicConfig(

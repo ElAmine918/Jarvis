@@ -39,7 +39,7 @@ class PythonREPLTool(Tool):
 
         code = kwargs.get("code", "")
 
-        # M-08 : Limite de taille du code (50 KB)
+        # Validation: Limite de taille du code (50 KB)
         _MAX_CODE_SIZE = 50 * 1024  # 50 KB
         if len(code.encode("utf-8")) > _MAX_CODE_SIZE:
             return f"❌ Le code dépasse la limite autorisée de {_MAX_CODE_SIZE // 1024} KB."

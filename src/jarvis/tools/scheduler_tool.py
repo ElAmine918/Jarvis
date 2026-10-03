@@ -7,7 +7,11 @@ from typing import Any
 import httpx
 
 from jarvis.core.config import ALLOWED_TELEGRAM_USER_IDS, TELEGRAM_BOT_TOKEN
-from jarvis.storage.logger_db import get_pending_jobs, mark_job_fired, save_scheduled_job
+from jarvis.storage.logger_db import (
+    get_pending_jobs,
+    mark_job_fired,
+    save_scheduled_job,
+)
 from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
@@ -71,11 +75,11 @@ class SchedulerTool(Tool):
         delay_minutes = kwargs.get("delay_minutes", 1)
         message = kwargs.get("message")
 
-        # M-13 : Valider le délai — min 1 min, max 24h (1440 min)
+        # Validation: Valider le délai — min 1 min, max 24h (1440 min)
         delay_minutes = max(1, min(int(delay_minutes), 1440))
         delay_seconds = delay_minutes * 60
 
-        # M-11 : Limiter le nombre de rappels actifs simultanés
+        # Validation: Limiter le nombre de rappels actifs simultanés
         _MAX_PENDING = 10
         active_tasks = [t for t in asyncio.all_tasks() if "reminder" in t.get_name()]
         if len(active_tasks) >= _MAX_PENDING:

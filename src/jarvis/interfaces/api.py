@@ -161,7 +161,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                     ),
                     "",
                 )
-                # H-12 : correction signature — session_id ajouté (6 args)
+                # Fix: correction signature — session_id ajouté (6 args)
                 log_conversation(
                     "open-webui",
                     "open-webui",
@@ -182,7 +182,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 yield "data: [DONE]\n\n"
             except Exception as e:
                 logger.error(f"Erreur agent stream: {e}", exc_info=True)
-                # M-03 : masquer les détails d'erreur dans le stream SSE
+                # Security: masquer les détails d'erreur dans le stream SSE
                 err = {
                     "error": {
                         "message": "Erreur interne du serveur.",
@@ -206,7 +206,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         last_user_msg = next(
             (m["content"] for m in reversed(messages_dicts) if m["role"] == "user"), ""
         )
-        # H-12 : correction signature — session_id ajouté (6 args)
+        # Fix: correction signature — session_id ajouté (6 args)
         log_conversation(
             "open-webui",
             "open-webui",
@@ -217,7 +217,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
         )
     except Exception as e:
         logger.error(f"Erreur agent: {e}", exc_info=True)
-        # M-02 : ne pas exposer les détails d'erreur internes
+        # Security: ne pas exposer les détails d'erreur internes
         raise HTTPException(status_code=500, detail="Erreur interne du serveur.")
 
     return ChatCompletionResponse(

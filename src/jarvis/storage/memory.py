@@ -150,9 +150,10 @@ class MemoryManager:
     async def get_fact(self, key: str) -> str | None:
         """Récupère la valeur d'un fait."""
         try:
-            async with aiosqlite.connect(self.db_path) as db, db.execute(
-                "SELECT value FROM facts WHERE key = ?", (key,)
-            ) as cursor:
+            async with (
+                aiosqlite.connect(self.db_path) as db,
+                db.execute("SELECT value FROM facts WHERE key = ?", (key,)) as cursor,
+            ):
                 row = await cursor.fetchone()
                 if row:
                     return row[0]

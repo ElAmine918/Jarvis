@@ -2,9 +2,9 @@ import logging
 from typing import Any
 
 import httpx
+from jarvis.filesystem import _safe_path
 
 from jarvis.tools.base import Tool
-from jarvis.filesystem import _safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class DocumentRAGTool(Tool):
         file_path = kwargs.get("file_path")
         question = kwargs.get("question")
 
-        # H-03 : Valider le chemin via le sandbox filesystem avant toute lecture
+        # Security: Valider le chemin via le sandbox filesystem avant toute lecture
         safe = _safe_path(file_path)
         if safe is None:
             return "🚫 Sécurité : chemin interdit. Le RAG est limité au répertoire /app/workspace."

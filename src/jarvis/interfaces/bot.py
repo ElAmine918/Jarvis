@@ -385,7 +385,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Erreur traitement message: {e}", exc_info=True)
         history.pop()  # Retirer le message utilisateur qui a échoué
-        # M-01 : Ne pas exposer les détails d'erreur internes à l'utilisateur
+        # Security: Ne pas exposer les détails d'erreur internes à l'utilisateur
         await update.message.reply_text(
             "❌ Une erreur interne s'est produite. Réessaie dans un instant."
         )

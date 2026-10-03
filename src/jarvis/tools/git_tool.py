@@ -60,7 +60,7 @@ class GitTool(Tool):
         if args[0] != "git":
             return "❌ Erreur de sécurité: Seul le binaire git est autorisé."
 
-        # H-04 : Allowlist des sous-commandes autorisées
+        # Security: Allowlist des sous-commandes autorisées
         _GIT_ALLOWED_SUBCOMMANDS = {
             "status",
             "add",
@@ -81,7 +81,7 @@ class GitTool(Tool):
             "rev-parse",
             "ls-files",
         }
-        # H-04 : Options dangereuses permettant l'exécution de code arbitraire
+        # Security: Options dangereuses permettant l'exécution de code arbitraire
         _GIT_DANGEROUS_FLAGS = {
             "-c",
             "--config",

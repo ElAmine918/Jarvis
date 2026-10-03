@@ -2,7 +2,7 @@ import os
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-# H-08 : Pas de mot de passe par défaut — forcer la configuration explicite
+# Security: Pas de mot de passe par défaut — forcer la configuration explicite
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 if not ADMIN_PASSWORD:
     # Log un warning sévère mais ne bloque pas le démarrage (compatibilité)

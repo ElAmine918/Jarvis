@@ -2,8 +2,8 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from jarvis.storage.memory import MemoryManager
 from jarvis.core.router import get_all_backends
+from jarvis.storage.memory import MemoryManager
 from jarvis.tools import get_default_registry
 
 logger = logging.getLogger(__name__)
