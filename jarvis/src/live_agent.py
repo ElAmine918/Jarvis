@@ -269,6 +269,25 @@ async def entrypoint(ctx: JobContext):
         ),
     )
 
+    
+    # 4. Outils / Function Calling
+    fnc_ctx = llm.FunctionContext()
+
+    @fnc_ctx.ai_callable(description="Navigue sur internet pour obtenir des infos en temps réel (météo, actualités, recherche générale).")
+    async def browse_internet(
+        url_or_search: str = llm.TypeInfo(description="Requête de recherche, ex: 'Météo Paris', 'News Tech'")
+    ):
+        from .tools.browser_tool import BrowserNavigateTool
+        tool = BrowserNavigateTool()
+        res = await tool.execute(url_or_search=url_or_search)
+        return res[:1500] if len(res) > 1500 else res
+
+    @fnc_ctx.ai_callable(description="Obtenir l'état du serveur Proxmox et des conteneurs Docker.")
+    async def proxmox_status():
+        from .tools.proxmox_tool import ProxmoxStatusTool
+        tool = ProxmoxStatusTool()
+        return await tool.execute()
+        
     # Définition de l'Assistant Vocal Jarvis
     assistant = VoiceAssistant(
         vad=silero.VAD.load(),
@@ -276,6 +295,7 @@ async def entrypoint(ctx: JobContext):
         llm=custom_llm,
         tts=tts_plugin,
         chat_ctx=chat_ctx,
+        fnc_ctx=fnc_ctx,
     )
 
     assistant.start(ctx.room, participant)
