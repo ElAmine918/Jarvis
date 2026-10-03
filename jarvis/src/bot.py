@@ -171,7 +171,6 @@ async def cmd_backend(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"ℹ️ *Dernier utilisé* : `{getattr(agent, 'last_backend_used', 'Inconnu')}`"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
-    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE):
