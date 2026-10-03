@@ -1,20 +1,20 @@
-# 🤖 Jarvis — Agentic AI Assistant
+# 🤖 Jarvis — Assistant IA Agentique
 
-> A self-hosted, highly autonomous AI assistant running on Docker. Jarvis is a multi-backend agentic AI with an automatic failover cascade, advanced memory (PostgreSQL + pgvector), and full DevOps capabilities (Docker, Git, Shell).
+> Un assistant IA auto-hébergé et hautement autonome fonctionnant sur Docker. Jarvis est un agent IA multi-backends avec une bascule automatique (failover cascade), une mémoire avancée (PostgreSQL + pgvector), et de pleines capacités DevOps (Docker, Git, Shell).
 
 ---
 
-## 🌟 Overview
+## 🌟 Présentation
 
-Jarvis acts as an autonomous infrastructure manager, researcher, and daily assistant. By interacting with Jarvis via **Telegram** or **Open WebUI**, you can ask it to deploy code, search the web, manage your Docker containers, or synthesize documents using advanced RAG (Retrieval-Augmented Generation).
+Jarvis agit comme un gestionnaire d'infrastructure autonome, un chercheur, et un assistant du quotidien. En interagissant avec Jarvis via **Telegram** ou **Open WebUI**, vous pouvez lui demander de déployer du code, chercher sur le web, gérer vos conteneurs Docker, ou synthétiser des documents grâce à son système RAG avancé (Retrieval-Augmented Generation).
 
-### Key Features
-- **4-Tier LLM Cascade:** Automatically falls back from cloud APIs (Gemini/OpenRouter) to local LLMs (Ollama/LM Studio) if the internet goes down or an API rate limits.
-- **Advanced RAG Memory:** Uses PostgreSQL with the `pgvector` extension for semantic hybrid search over your past conversations and documents.
-- **DevOps Capabilities:** Can read logs, execute shell commands, manage Git repositories, and control Docker containers.
-- **Human-in-the-Loop:** Critical actions (like modifying containers or making destructive system changes) are pushed to Telegram as interactive buttons for your approval before execution.
-- **Multi-Agent Consensus:** Can spawn a panel of sub-agents to debate complex problems and synthesize a final answer.
-- **Voice Capabilities:** Supports Speech-to-Text and Text-to-Speech via local models or cloud fallback.
+### Fonctionnalités Clés
+- **Cascade LLM à 4 Niveaux :** Bascule automatiquement des API cloud (Gemini/OpenRouter) vers des LLM locaux (Ollama/LM Studio) si internet coupe ou si une API impose des limites.
+- **Mémoire RAG Avancée :** Utilise PostgreSQL avec l'extension `pgvector` pour une recherche hybride sémantique sur vos anciennes conversations et documents.
+- **Capacités DevOps :** Peut lire des logs, exécuter des commandes shell, gérer des dépôts Git, et contrôler des conteneurs Docker.
+- **Validation Humaine (Human-in-the-Loop) :** Les actions critiques (comme modifier des conteneurs ou des changements système destructeurs) envoient une demande d'approbation sur Telegram sous forme de boutons interactifs.
+- **Consensus Multi-Agents :** Capable de générer un panel de sous-agents pour débattre de problèmes complexes et synthétiser une réponse finale.
+- **Capacités Vocales :** Supporte le Speech-to-Text et le Text-to-Speech via des modèles locaux ou le cloud.
 
 ## 🏗️ Architecture
 
@@ -27,83 +27,83 @@ Jarvis acts as an autonomous infrastructure manager, researcher, and daily assis
                             │                 │
                             ▼                 ▼
 ┌───────────────────────────────────────────────────────────┐
-│                    DOCKER HOST                            │
+│                    SERVEUR DOCKER                         │
 │                                                           │
 │  ┌─────────────────────────────────────────────────────┐  │
-│  │ Docker Compose Stack                                │  │
+│  │ Stack Docker Compose                                │  │
 │  │                                                     │  │
-│  │  ├─ jarvis          (Core AI Agent, :8080)          │  │
-│  │  ├─ jarvis-live     (LiveKit Voice Agent)           │  │
-│  │  ├─ jarvis-pgvector (PostgreSQL + Vector Memory)    │  │
-│  │  ├─ open-webui      (Web Chat Interface)            │  │
+│  │  ├─ jarvis          (Agent IA Principal, :8080)     │  │
+│  │  ├─ jarvis-live     (Agent Vocal LiveKit)           │  │
+│  │  ├─ jarvis-pgvector (PostgreSQL + Mémoire Vectoriel)│  │
+│  │  ├─ open-webui      (Interface Web de Chat)         │  │
 │  │  ├─ caddy           (Reverse Proxy / HTTPS)         │  │
-│  │  └─ docker-proxy    (Security Socket Proxy)         │  │
+│  │  └─ docker-proxy    (Proxy Socket Sécurisé)         │  │
 │  └─────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────┘
 ```
 
-## 🔒 Security & Privacy
+## 🔒 Sécurité & Vie Privée
 
-- **Private Persona:** The agent's personality is entirely driven by `data/system_prompt.txt`. This file is intentionally `.gitignore`d so you can give your assistant a highly personal, private persona (e.g., a specific character, a personal friend, or an efficient robot) without leaking it to public repositories.
-- **Docker Socket Security:** Jarvis does not have raw access to `/var/run/docker.sock`. All commands are routed through an isolated `tecnativa/docker-socket-proxy`.
-- **Filesystem Sandbox:** Jarvis is restricted to reading and writing within `/app/workspace/`.
-- **Interactive Approvals:** Destructive actions trigger an approval flow on Telegram.
+- **Personnalité Privée :** La personnalité de l'agent est entièrement pilotée par le fichier `data/system_prompt.txt`. Ce fichier est intentionnellement ignoré par Git (`.gitignore`) pour que vous puissiez donner à votre assistant une personnalité très intime sans qu'elle ne fuite sur les dépôts publics.
+- **Sécurité du Socket Docker :** Jarvis n'a pas un accès brut au socket `/var/run/docker.sock`. Toutes les commandes passent par un conteneur isolé `tecnativa/docker-socket-proxy`.
+- **Sandbox Système :** Jarvis est restreint en lecture et écriture uniquement au dossier `/app/workspace/`.
+- **Approbations Interactives :** Les actions destructrices nécessitent votre accord explicite sur Telegram.
 
-## 🚀 Quick Start
+## 🚀 Démarrage Rapide
 
-### 1. Prerequisites
-- A Docker-compatible host (Linux/Mac/Proxmox)
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
-- API Keys (Gemini, OpenRouter, etc.)
+### 1. Prérequis
+- Un serveur compatible Docker (Linux/Mac/Proxmox)
+- Un token de bot Telegram (obtenu via [@BotFather](https://t.me/BotFather))
+- Vos clés API (Gemini, OpenRouter, etc.)
 
-### 2. Setup
-Clone the repository and prepare your environment:
+### 2. Installation
+Clonez le dépôt et préparez votre environnement :
 
 ```bash
-git clone https://github.com/YourUsername/Jarvis.git
+git clone https://github.com/VotreUtilisateur/Jarvis.git
 cd Jarvis
 
-# Configure your environment variables
-cp .env.example .env  # (Create this file and add your keys)
+# Configurez vos variables d'environnement
+cp .env.example .env  # (Créez ce fichier et ajoutez-y vos clés)
 nano .env
 
-# Configure the agent's persona (This file remains private)
+# Configurez la personnalité de l'agent (ce fichier reste privé)
 mkdir -p data
-echo "You are a highly efficient and concise AI assistant." > data/system_prompt.txt
+echo "Tu es un assistant IA extrêmement efficace et concis." > data/system_prompt.txt
 ```
 
-### 3. Launch
+### 3. Lancement
 ```bash
 docker compose up -d --build
 ```
 
-### 4. Interact
-- **Telegram:** Send `/start` to your bot.
-- **Web UI:** Navigate to `http://your-server-ip:3000` (or your domain handled by Caddy).
+### 4. Utilisation
+- **Telegram :** Envoyez `/start` à votre bot.
+- **Interface Web :** Naviguez vers `http://ip-de-votre-serveur:3000` (ou votre domaine géré par Caddy).
 
-## 📁 Repository Structure
+## 📁 Structure du Projet
 
 ```text
 Jarvis/
-├── docker-compose.yml     # Orchestration stack
-├── Dockerfile             # Agent build instructions
-├── Caddyfile              # Reverse proxy configurations
-├── requirements.txt       # Python dependencies
-├── src/jarvis/            # Core application code
-│   ├── core/              # LLM routing, Agent logic, Config
-│   ├── interfaces/        # API, Telegram Bot, Voice inputs
-│   ├── storage/           # PostgreSQL memory & SQLite logs
-│   └── tools/             # 18+ agentic capabilities
-├── db/                    # PostgreSQL schemas and backfills
-├── tests/                 # Pytest suite
-└── scripts/               # Backup and operational shell scripts
+├── docker-compose.yml     # L'orchestration des conteneurs
+├── Dockerfile             # Instructions de construction de l'agent
+├── Caddyfile              # Configuration du reverse proxy
+├── requirements.txt       # Dépendances Python
+├── src/jarvis/            # Code applicatif principal
+│   ├── core/              # Routage LLM, Logique de l'agent, Config
+│   ├── interfaces/        # API, Bot Telegram, Gestion vocale
+│   ├── storage/           # Mémoire PostgreSQL & Logs SQLite
+│   └── tools/             # Les différents outils (+ de 18) de l'agent
+├── db/                    # Schémas PostgreSQL
+├── tests/                 # Suite de tests Pytest
+└── scripts/               # Scripts shell (sauvegardes, etc.)
 ```
 
-## 🛠️ Developing & Extending
+## 🛠️ Développement & Extension
 
-Jarvis is built with standard Python (FastAPI). Adding a new tool is as simple as creating a new file in `src/jarvis/tools/` that inherits from `Tool` and registers itself. 
+Jarvis est codé en Python standard (FastAPI). Ajouter un nouvel outil est aussi simple que de créer un nouveau fichier dans `src/jarvis/tools/` qui hérite de `Tool` et qui s'enregistre de lui-même.
 
-To run tests locally:
+Pour lancer les tests localement :
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -112,4 +112,4 @@ PYTHONPATH=src pytest tests/
 ```
 
 ---
-**License:** MIT
+**Licence :** MIT
