@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 import httpx
-from jarvis.filesystem import _safe_path
+from jarvis.tools.filesystem import _safe_path
 
 from jarvis.tools.base import Tool
 

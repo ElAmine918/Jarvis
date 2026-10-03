@@ -539,6 +539,11 @@ def build_app(agent: JarvisAgent) -> Application:
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False)
     )
+
+    app.add_handler(
+        MessageHandler(filters.PHOTO, handle_photo, block=False)
+    )
+
     app.add_handler(CallbackQueryHandler(handle_callback, block=False))
 
     return app
@@ -582,3 +587,64 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception:
                 pass
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _check_allowed(update):
+        return
+
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "Inconnu"
+    caption = update.message.caption or "Décris cette image en détail."
+
+    logger.info(f"[TELEGRAM] Photo reçue de ID:{user_id} (@{username}) avec légende : {caption}")
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+
+    # Get the highest resolution photo
+    photo_file = await update.message.photo[-1].get_file()
+    import io
+    import base64
+    out = io.BytesIO()
+    await photo_file.download_to_memory(out)
+    b64 = base64.b64encode(out.getvalue()).decode("utf-8")
+
+    agent: JarvisAgent = context.bot_data["agent"]
+
+    if "history" not in context.user_data:
+        context.user_data["history"] = []
+
+    history = context.user_data["history"]
+    
+    # Format multimodale OpenAI
+    message_content = [
+        {"type": "text", "text": caption},
+        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+    ]
+    
+    history.append({"role": "user", "content": message_content})
+
+    if len(history) > 10:
+        history = history[-10:]
+
+    try:
+        response = ""
+        async for chunk in agent.process_message(history, str(user_id)):
+            response += chunk
+
+        history.append({"role": "assistant", "content": response})
+
+        from jarvis.storage.logger_db import log_conversation
+        backend_used = getattr(agent, "last_backend_used", "Inconnu")
+        log_conversation(str(user_id), "telegram", str(user_id), "[IMAGE]", response, backend_used)
+
+        if len(response) < 4000:
+            try:
+                await update.message.reply_text(response, parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await update.message.reply_text(response)
+        else:
+            for i in range(0, len(response), 4000):
+                await update.message.reply_text(response[i : i + 4000])
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement de l'image: {e}")
+        await update.message.reply_text("Désolé, j'ai rencontré une erreur en analysant cette image.")
+

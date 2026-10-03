@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import quote
 
 import httpx
-from jarvis.web_reader import _is_safe_url
+from jarvis.tools.web_reader import _is_safe_url
 
 from jarvis.tools.base import Tool
 
