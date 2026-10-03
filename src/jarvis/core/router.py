@@ -349,10 +349,9 @@ async def get_all_backends(history: list = None) -> list:
         return []
 
     # Filtrer le pool par le score requis (on garde quand même ceux du même Tier si on n'a rien d'autre)
-    qualified_pool = [b for b in available_pool if b["score"] >= req_score]
-    if not qualified_pool:
-        # Si aucun modèle ne qualifie, on prend tout le pool disponible
-        qualified_pool = available_pool
+    # Pas de filtrage agressif. On trie simplement tout le pool.
+    # Les modèles "faibles" (Ollama) seront en dernier recours.
+    qualified_pool = available_pool
 
     # Tri du pool
     def sort_key(b):
