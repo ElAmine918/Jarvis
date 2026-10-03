@@ -13,6 +13,7 @@ from .rag_tool import DocumentRAGTool
 from .scheduler_tool import SchedulerTool
 from .shell import ShellTool
 from .system_info import SystemInfoTool
+from .self_improve import SelfImproveTool
 from .web_reader import NewsSearchTool, WebReaderTool
 
 __all__ = ["Tool", "ToolRegistry", "get_default_registry"]
@@ -38,4 +39,5 @@ def get_default_registry() -> ToolRegistry:
     registry.register(GitTool())
     registry.register(ProxmoxStatusTool())
     registry.register(ProxmoxActionTool())
+    registry.register(SelfImproveTool())
     return registry
