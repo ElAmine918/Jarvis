@@ -1,24 +1,14 @@
 # Caddyfile — Reverse Proxy
 #
-# Par défaut, Caddy répond sur le port 80/443.
-# Ajoute tes projets ici au fur et à mesure.
-#
-# Si tu as un domaine (ex: mycloud.example.com), remplace
-# :80 par ton domaine et Caddy gère le HTTPS automatiquement.
-#
-# Pour l'instant, accès local uniquement via Tailscale IP.
+# If you have a domain (e.g., jarvis.example.com), replace :80 with your domain
+# and Caddy will automatically provision Let's Encrypt HTTPS certificates.
 
 :80 {
-    respond "Jarvis is running. Nothing to see here." 200
-}
+    # Route traffic to the Open WebUI container by default
+    reverse_proxy open-webui:8080
 
-# --- Exemples pour tes projets ---
-# Décommente et adapte quand tu déploies un projet
-#
-# chess.mycloud.example.com {
-#     reverse_proxy chess-backend:8000
-# }
-#
-# app.mycloud.example.com {
-#     reverse_proxy my-app:3000
-# }
+    # Route /api/ traffic directly to the Jarvis backend
+    handle /api/* {
+        reverse_proxy jarvis:8080
+    }
+}
