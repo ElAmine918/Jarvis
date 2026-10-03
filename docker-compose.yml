@@ -43,6 +43,7 @@ services:
     env_file: .env
     environment:
       DOCKER_HOST: tcp://docker-proxy:2375
+      LM_STUDIO_MODEL: qwen/qwen3.5-9b
     ports:
     - 8080:8080
     volumes:
@@ -189,6 +190,8 @@ services:
     container_name: jarvis-live
     restart: unless-stopped
     env_file: .env
+    environment:
+      LM_STUDIO_MODEL: qwen/qwen3.5-9b
     command: python3 -m jarvis.interfaces.live_agent start
     healthcheck:
       disable: true
