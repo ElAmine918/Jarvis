@@ -1,8 +1,10 @@
 import logging
-from typing import Dict, Any
+from typing import Any
+
 from .base import Tool
 
 logger = logging.getLogger(__name__)
+
 
 class ImageGenerationTool(Tool):
     @property
@@ -14,16 +16,16 @@ class ImageGenerationTool(Tool):
         return "Génère une image à partir d'un prompt textuel."
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "La description détaillée de l'image à générer."
+                    "description": "La description détaillée de l'image à générer.",
                 }
             },
             "required": ["prompt"],
-            "type": "object"
+            "type": "object",
         }
 
     async def execute(self, **kwargs) -> str:

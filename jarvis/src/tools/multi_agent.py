@@ -1,14 +1,17 @@
-import httpx
 import logging
-import json
 import os
-from typing import Dict, Any
+from typing import Any
+
+import httpx
+
 from .base import Tool
 
 logger = logging.getLogger(__name__)
 
+
 def _get_api_headers():
     return {"Authorization": f"Bearer {os.getenv('JARVIS_API_KEY', '')}"}
+
 
 class SubagentTool(Tool):
     @property
@@ -23,41 +26,54 @@ class SubagentTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "task": {
                     "type": "string",
-                    "description": "Les instructions claires et détaillées pour le sous-agent."
+                    "description": "Les instructions claires et détaillées pour le sous-agent.",
                 },
                 "model_tier": {
                     "type": "string",
                     "description": "Le modèle à utiliser. Options: 'jarvis-gemini' (très rapide, cloud), 'jarvis-ollama' (local 7B), 'jarvis-auto' (cascade par défaut).",
-                    "enum": ["jarvis-gemini", "jarvis-ollama", "jarvis-auto"]
-                }
+                    "enum": ["jarvis-gemini", "jarvis-ollama", "jarvis-auto"],
+                },
             },
             "required": ["task", "model_tier"],
-            "type": "object"
+            "type": "object",
         }
 
     async def execute(self, **kwargs) -> str:
         task = kwargs.get("task")
         model_tier = kwargs.get("model_tier", "jarvis-auto")
-        
+
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 payload = {
                     "model": model_tier,
-                    "messages": [{"role": "user", "content": f"Tu es un sous-agent. Voici ta tâche :\n\n{task}"}],
-                    "stream": False
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": f"Tu es un sous-agent. Voici ta tâche :\n\n{task}",
+                        }
+                    ],
+                    "stream": False,
                 }
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                resp = await client.post(
+                    "http://127.0.0.1:8080/v1/chat/completions",
+                    json=payload,
+                    headers=_get_api_headers(),
+                )
                 resp.raise_for_status()
                 data = resp.json()
-                return f"Réponse du sous-agent ({model_tier}) :\n" + data["choices"][0]["message"]["content"]
+                return (
+                    f"Réponse du sous-agent ({model_tier}) :\n"
+                    + data["choices"][0]["message"]["content"]
+                )
         except Exception as e:
             logger.error(f"Erreur Subagent: {e}")
-            return f"Le sous-agent a échoué: {str(e)}"
+            return f"Le sous-agent a échoué: {e!s}"
+
 
 class AdvisorTool(Tool):
     @property
@@ -72,40 +88,47 @@ class AdvisorTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "question": {
                     "type": "string",
-                    "description": "La question précise posée au conseiller."
+                    "description": "La question précise posée au conseiller.",
                 },
                 "context": {
                     "type": "string",
-                    "description": "Le contexte actuel de la conversation pour que le conseiller comprenne la situation."
-                }
+                    "description": "Le contexte actuel de la conversation pour que le conseiller comprenne la situation.",
+                },
             },
             "required": ["question", "context"],
-            "type": "object"
+            "type": "object",
         }
 
     async def execute(self, **kwargs) -> str:
         question = kwargs.get("question")
         context = kwargs.get("context", "")
-        
+
         prompt = f"Tu es un conseiller expert. Voici le contexte actuel :\n{context}\n\nQuestion de l'agent principal :\n{question}\n\nDonne une analyse critique et des conseils."
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 payload = {
                     "model": "jarvis-gemini",
                     "messages": [{"role": "user", "content": prompt}],
-                    "stream": False
+                    "stream": False,
                 }
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                resp = await client.post(
+                    "http://127.0.0.1:8080/v1/chat/completions",
+                    json=payload,
+                    headers=_get_api_headers(),
+                )
                 resp.raise_for_status()
                 data = resp.json()
-                return "Avis du Conseiller :\n" + data["choices"][0]["message"]["content"]
+                return (
+                    "Avis du Conseiller :\n" + data["choices"][0]["message"]["content"]
+                )
         except Exception as e:
-            return f"Le conseiller n'est pas joignable: {str(e)}"
+            return f"Le conseiller n'est pas joignable: {e!s}"
+
 
 class FusionTool(Tool):
     @property
@@ -120,27 +143,36 @@ class FusionTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "problem": {
                     "type": "string",
-                    "description": "Le problème à soumettre au panel."
+                    "description": "Le problème à soumettre au panel.",
                 }
             },
             "required": ["problem"],
-            "type": "object"
+            "type": "object",
         }
 
     async def execute(self, **kwargs) -> str:
         import asyncio
+
         problem = kwargs.get("problem")
-        
+
         async def ask_model(model_id: str):
             try:
                 async with httpx.AsyncClient(timeout=120.0) as client:
-                    payload = {"model": model_id, "messages": [{"role": "user", "content": problem}], "stream": False}
-                    resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                    payload = {
+                        "model": model_id,
+                        "messages": [{"role": "user", "content": problem}],
+                        "stream": False,
+                    }
+                    resp = await client.post(
+                        "http://127.0.0.1:8080/v1/chat/completions",
+                        json=payload,
+                        headers=_get_api_headers(),
+                    )
                     resp.raise_for_status()
                     return resp.json()["choices"][0]["message"]["content"]
             except Exception:
@@ -149,20 +181,28 @@ class FusionTool(Tool):
         results = await asyncio.gather(
             ask_model("jarvis-gemini"),
             ask_model("jarvis-ollama"),
-            return_exceptions=True
+            return_exceptions=True,
         )
-        
+
         gemini_ans = results[0] if not isinstance(results[0], Exception) else "Erreur"
         ollama_ans = results[1] if not isinstance(results[1], Exception) else "Erreur"
-        
+
         synthesis_prompt = f"Tu es l'Analyste Fusion. Voici le problème initial :\n{problem}\n\nRéponse Panéliste 1 (Gemini):\n{gemini_ans}\n\nRéponse Panéliste 2 (Ollama):\n{ollama_ans}\n\nSynthétise la meilleure réponse."
-        
+
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                payload = {"model": "jarvis-auto", "messages": [{"role": "user", "content": synthesis_prompt}], "stream": False}
-                resp = await client.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, headers=_get_api_headers())
+                payload = {
+                    "model": "jarvis-auto",
+                    "messages": [{"role": "user", "content": synthesis_prompt}],
+                    "stream": False,
+                }
+                resp = await client.post(
+                    "http://127.0.0.1:8080/v1/chat/completions",
+                    json=payload,
+                    headers=_get_api_headers(),
+                )
                 resp.raise_for_status()
                 final_synth = resp.json()["choices"][0]["message"]["content"]
                 return f"**Synthèse du Panel Fusion :**\n{final_synth}"
         except Exception as e:
-            return f"Erreur de l'analyste: {str(e)}"
+            return f"Erreur de l'analyste: {e!s}"

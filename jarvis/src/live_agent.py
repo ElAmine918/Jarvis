@@ -2,11 +2,18 @@ import asyncio
 import logging
 import os
 import re
-from typing import Optional
 
 import edge_tts
 import httpx
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm, tts, utils
+from livekit.agents import (
+    AutoSubscribe,
+    JobContext,
+    WorkerOptions,
+    cli,
+    llm,
+    tts,
+    utils,
+)
 from livekit.agents.types import APIConnectOptions
 from livekit.agents.voice_assistant import VoiceAssistant
 from livekit.plugins import openai, silero
@@ -16,11 +23,11 @@ logger = logging.getLogger("jarvis-live")
 
 def sanitize_speech_text(text: str) -> str:
     """Nettoie le texte avant synthèse vocale : filtre anti-Monsieur absolu et markdown."""
-    text = re.sub(r'(?i)\b(monsieur)\b', '', text)
-    text = re.sub(r'[*_`#~]', '', text)
-    text = re.sub(r',\s*([?!.])', r'\1', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    text = re.sub(r'^[,\s.-]+|[,\s.-]+$', '', text).strip()
+    text = re.sub(r"(?i)\b(monsieur)\b", "", text)
+    text = re.sub(r"[*_`#~]", "", text)
+    text = re.sub(r",\s*([?!.])", r"\1", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"^[,\s.-]+|[,\s.-]+$", "", text).strip()
     if text and text[0].islower():
         text = text[0].upper() + text[1:]
     return text
@@ -35,9 +42,11 @@ class ElevenLabsChunkedStream(tts.ChunkedStream):
         voice: str,
         api_key: str,
         model_id: str = "eleven_multilingual_v2",
-        conn_options: Optional[APIConnectOptions] = None,
+        conn_options: APIConnectOptions | None = None,
     ):
-        super().__init__(tts=tts_instance, input_text=input_text, conn_options=conn_options)
+        super().__init__(
+            tts=tts_instance, input_text=input_text, conn_options=conn_options
+        )
         self._voice = voice
         self._api_key = api_key
         self._model_id = model_id
@@ -66,10 +75,14 @@ class ElevenLabsChunkedStream(tts.ChunkedStream):
         async def _stream_producer():
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
-                    async with client.stream("POST", url, headers=headers, json=payload) as response:
+                    async with client.stream(
+                        "POST", url, headers=headers, json=payload
+                    ) as response:
                         if response.status_code != 200:
                             err_body = await response.aread()
-                            logger.error(f"Erreur ElevenLabs ({response.status_code}): {err_body.decode(errors='ignore')}")
+                            logger.error(
+                                f"Erreur ElevenLabs ({response.status_code}): {err_body.decode(errors='ignore')}"
+                            )
                             return
                         async for chunk in response.aiter_bytes():
                             decoder.push(chunk)
@@ -113,7 +126,7 @@ class ElevenLabsTTS(tts.TTS):
         self,
         text: str,
         *,
-        conn_options: Optional[APIConnectOptions] = None,
+        conn_options: APIConnectOptions | None = None,
     ) -> tts.ChunkedStream:
         return ElevenLabsChunkedStream(
             tts_instance=self,
@@ -132,9 +145,11 @@ class EdgeTTSChunkedStream(tts.ChunkedStream):
         tts_instance: tts.TTS,
         input_text: str,
         voice: str,
-        conn_options: Optional[APIConnectOptions] = None,
+        conn_options: APIConnectOptions | None = None,
     ):
-        super().__init__(tts=tts_instance, input_text=input_text, conn_options=conn_options)
+        super().__init__(
+            tts=tts_instance, input_text=input_text, conn_options=conn_options
+        )
         self._voice = voice
 
     async def _run(self) -> None:
@@ -186,7 +201,7 @@ class EdgeTTS(tts.TTS):
         self,
         text: str,
         *,
-        conn_options: Optional[APIConnectOptions] = None,
+        conn_options: APIConnectOptions | None = None,
     ) -> tts.ChunkedStream:
         return EdgeTTSChunkedStream(
             tts_instance=self,
@@ -208,8 +223,12 @@ async def entrypoint(ctx: JobContext):
     groq_api_key = os.getenv("GROQ_API_KEY", "")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
-    eleven_api_key = os.getenv("ELEVEN_API_KEY", "") or os.getenv("ELEVENLABS_API_KEY", "")
-    eleven_voice_id = os.getenv("ELEVEN_VOICE_ID", "nPczCjzI2devNBz1zQrb")  # Brian par défaut
+    eleven_api_key = os.getenv("ELEVEN_API_KEY", "") or os.getenv(
+        "ELEVENLABS_API_KEY", ""
+    )
+    eleven_voice_id = os.getenv(
+        "ELEVEN_VOICE_ID", "nPczCjzI2devNBz1zQrb"
+    )  # Brian par défaut
 
     # 1. STT (Écoute / Transcription)
     if groq_api_key:
@@ -253,8 +272,12 @@ async def entrypoint(ctx: JobContext):
             model_id="eleven_multilingual_v2",
         )
     else:
-        logger.info("ElevenLabs non configuré -> Utilisation d'EdgeTTS (Remy Multilingual)")
-        tts_plugin = EdgeTTS(voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-RemyMultilingualNeural"))
+        logger.info(
+            "ElevenLabs non configuré -> Utilisation d'EdgeTTS (Remy Multilingual)"
+        )
+        tts_plugin = EdgeTTS(
+            voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-RemyMultilingualNeural")
+        )
 
     # Contexte & Personnalité Jarvis
     chat_ctx = llm.ChatContext().append(
@@ -269,25 +292,32 @@ async def entrypoint(ctx: JobContext):
         ),
     )
 
-    
     # 4. Outils / Function Calling
     fnc_ctx = llm.FunctionContext()
 
-    @fnc_ctx.ai_callable(description="Navigue sur internet pour obtenir des infos en temps réel (météo, actualités, recherche générale).")
+    @fnc_ctx.ai_callable(
+        description="Navigue sur internet pour obtenir des infos en temps réel (météo, actualités, recherche générale)."
+    )
     async def browse_internet(
-        url_or_search: str = llm.TypeInfo(description="Requête de recherche, ex: 'Météo Paris', 'News Tech'")
+        url_or_search: str = llm.TypeInfo(
+            description="Requête de recherche, ex: 'Météo Paris', 'News Tech'"
+        ),
     ):
         from .tools.browser_tool import BrowserNavigateTool
+
         tool = BrowserNavigateTool()
         res = await tool.execute(url_or_search=url_or_search)
         return res[:1500] if len(res) > 1500 else res
 
-    @fnc_ctx.ai_callable(description="Obtenir l'état du serveur Proxmox et des conteneurs Docker.")
+    @fnc_ctx.ai_callable(
+        description="Obtenir l'état du serveur Proxmox et des conteneurs Docker."
+    )
     async def proxmox_status():
         from .tools.proxmox_tool import ProxmoxStatusTool
+
         tool = ProxmoxStatusTool()
         return await tool.execute()
-        
+
     # Définition de l'Assistant Vocal Jarvis
     assistant = VoiceAssistant(
         vad=silero.VAD.load(),

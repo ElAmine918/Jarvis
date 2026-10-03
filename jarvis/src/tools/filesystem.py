@@ -3,10 +3,10 @@ Outil Filesystem — accès strictement restreint au workspace.
 Pas de shell. Chaque opération est implémentée nativement en Python.
 La validation de chemin utilise Path.resolve().is_relative_to() — immune aux `..`.
 """
+
 import logging
-import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from .base import Tool
 
@@ -45,37 +45,44 @@ class FileSystemTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "action": {
                     "type": "string",
                     "enum": ["read", "write", "list", "mkdir", "stat"],
-                    "description": "Action à effectuer."
+                    "description": "Action à effectuer.",
                 },
                 "path": {
                     "type": "string",
-                    "description": "Chemin relatif par rapport à /app/workspace."
+                    "description": "Chemin relatif par rapport à /app/workspace.",
                 },
                 "content": {
                     "type": "string",
-                    "description": "Contenu à écrire (pour 'write' uniquement)."
+                    "description": "Contenu à écrire (pour 'write' uniquement).",
                 },
                 "start_line": {
                     "type": "integer",
-                    "description": "Ligne de début pour la lecture partielle (optionnel)."
+                    "description": "Ligne de début pour la lecture partielle (optionnel).",
                 },
                 "end_line": {
                     "type": "integer",
-                    "description": "Ligne de fin pour la lecture partielle (optionnel)."
-                }
+                    "description": "Ligne de fin pour la lecture partielle (optionnel).",
+                },
             },
-            "required": ["action", "path"]
+            "required": ["action", "path"],
         }
 
-    async def execute(self, action: str, path: str = ".", content: str = None,
-                      start_line: int = None, end_line: int = None,
-                      query: str = None, **kwargs) -> str:
+    async def execute(
+        self,
+        action: str,
+        path: str = ".",
+        content: str = None,
+        start_line: int = None,
+        end_line: int = None,
+        query: str = None,
+        **kwargs,
+    ) -> str:
         safe = _safe_path(path)
         if safe is None:
             logger.warning(f"Tentative de path traversal bloquée: {path!r}")
@@ -87,9 +94,13 @@ class FileSystemTool(Tool):
                 entries = sorted(target.iterdir(), key=lambda p: (p.is_file(), p.name))
                 lines = []
                 for e in entries:
-                    size = f"{e.stat().st_size:>10} B" if e.is_file() else "         DIR"
+                    size = (
+                        f"{e.stat().st_size:>10} B" if e.is_file() else "         DIR"
+                    )
                     lines.append(f"{size}  {e.name}")
-                return f"Contenu de {target.relative_to(WORKSPACE)}:\n" + "\n".join(lines)
+                return f"Contenu de {target.relative_to(WORKSPACE)}:\n" + "\n".join(
+                    lines
+                )
             except Exception as e:
                 return f"❌ Erreur liste: {e}"
 

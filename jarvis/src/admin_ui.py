@@ -1,17 +1,20 @@
-import os
-import psutil
-import datetime
-import random
-
 import secrets
-from .tools import get_default_registry
+
+import psutil
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import HTMLResponse
-from .config import ADMIN_PASSWORD
-from .logger_db import get_recent_conversations, get_recent_actions
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+from .config import (
+    ADMIN_PASSWORD,
+    GEMINI_API_KEY,
+    LM_STUDIO_URL,
+    OLLAMA_LOCAL_URL,
+    OPENROUTER_API_KEY,
+)
+from .logger_db import get_recent_actions, get_recent_conversations
 from .router import check_endpoint
-from .config import LM_STUDIO_URL, ADMIN_PASSWORD, OLLAMA_LOCAL_URL, GEMINI_API_KEY, OPENROUTER_API_KEY
+from .tools import get_default_registry
 
 admin_router = APIRouter()
 
@@ -448,10 +451,11 @@ DASHBOARD_HTML = """
 
 security = HTTPBasic()
 
+
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     if not ADMIN_PASSWORD:
-        return credentials # Mode developpement
-        
+        return credentials  # Mode developpement
+
     correct_username = secrets.compare_digest(credentials.username, "admin")
     correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
     if not (correct_username and correct_password):
@@ -462,20 +466,22 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
         )
     return credentials
 
+
 @admin_router.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(_=Depends(verify_admin)):
     return HTMLResponse(content=DASHBOARD_HTML)
+
 
 @admin_router.get("/admin/api/data")
 async def admin_api_data(_=Depends(verify_admin)):
 
     convs = get_recent_conversations(15)
     acts = get_recent_actions(20)
-    
+
     # Check endpoints but limit timeout to prevent dashboard lag
     lm_up = await check_endpoint(LM_STUDIO_URL, 0.5)
     ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 0.5)
-    
+
     return {
         "tools_count": len(get_default_registry()._tools),
         "conversations": convs,
@@ -484,10 +490,7 @@ async def admin_api_data(_=Depends(verify_admin)):
             "lm_studio": lm_up,
             "openrouter": bool(OPENROUTER_API_KEY),
             "gemini": bool(GEMINI_API_KEY),
-            "ollama": ollama_up
+            "ollama": ollama_up,
         },
-        "stats": {
-            "cpu": psutil.cpu_percent(),
-            "ram": psutil.virtual_memory().percent
-        }
+        "stats": {"cpu": psutil.cpu_percent(), "ram": psutil.virtual_memory().percent},
     }

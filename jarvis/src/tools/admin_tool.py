@@ -1,14 +1,16 @@
 import asyncio
 import logging
 import uuid
-import httpx
-from typing import Dict, Any
+from typing import Any
 
+import httpx
+
+from ..approvals import APPROVAL_RESULTS, PENDING_APPROVALS
+from ..config import ALLOWED_TELEGRAM_USER_IDS, TELEGRAM_BOT_TOKEN
 from .base import Tool
-from ..config import TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USER_IDS
-from ..approvals import PENDING_APPROVALS, APPROVAL_RESULTS
 
 logger = logging.getLogger(__name__)
+
 
 class AdminActionTool(Tool):
     @property
@@ -24,26 +26,28 @@ class AdminActionTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "action": {
                     "type": "string",
-                    "description": "L'action Docker à forcer (ex: 'stop', 'restart', 'rm -f')"
+                    "description": "L'action Docker à forcer (ex: 'stop', 'restart', 'rm -f')",
                 },
                 "container_name": {
                     "type": "string",
-                    "description": "Le nom du conteneur cible (ex: 'open-webui')"
+                    "description": "Le nom du conteneur cible (ex: 'open-webui')",
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Pourquoi as-tu besoin de faire ça ? (Sera lu par l'admin)"
-                }
+                    "description": "Pourquoi as-tu besoin de faire ça ? (Sera lu par l'admin)",
+                },
             },
-            "required": ["action", "container_name", "reason"]
+            "required": ["action", "container_name", "reason"],
         }
 
-    async def execute(self, action: str, container_name: str, reason: str, **kwargs) -> str:
+    async def execute(
+        self, action: str, container_name: str, reason: str, **kwargs
+    ) -> str:
         if not TELEGRAM_BOT_TOKEN or not ALLOWED_TELEGRAM_USER_IDS:
             return "❌ Impossible: Telegram n'est pas configuré pour les approbations."
 
@@ -65,7 +69,7 @@ class AdminActionTool(Tool):
             "inline_keyboard": [
                 [
                     {"text": "✅ Approuver", "callback_data": f"approve_{req_id}"},
-                    {"text": "❌ Refuser", "callback_data": f"reject_{req_id}"}
+                    {"text": "❌ Refuser", "callback_data": f"reject_{req_id}"},
                 ]
             ]
         }
@@ -84,8 +88,8 @@ class AdminActionTool(Tool):
                         "chat_id": admin_id,
                         "text": text_msg,
                         "parse_mode": "Markdown",
-                        "reply_markup": keyboard
-                    }
+                        "reply_markup": keyboard,
+                    },
                 )
         except Exception as e:
             PENDING_APPROVALS.pop(req_id, None)
@@ -107,18 +111,21 @@ class AdminActionTool(Tool):
             return "❌ L'administrateur a REFUSÉ l'action. N'insiste pas."
 
         # L'action est approuvée ! On l'exécute avec les args validés (allowlist)
-        logger.warning(f"Action '{action} {container_name}' approuvée par l'admin ! Exécution.")
-        
+        logger.warning(
+            f"Action '{action} {container_name}' approuvée par l'admin ! Exécution."
+        )
+
         # H-01 : args construits depuis des valeurs validées, pas depuis action.split()
         proc = await asyncio.create_subprocess_exec(
-            "docker", action, container_name,
+            "docker",
+            action,
+            container_name,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
-        
+
         if proc.returncode != 0:
             return f"❌ Action approuvée mais erreur d'exécution Docker : {stderr.decode()}"
-            
-        return f"✅ L'administrateur a approuvé et l'action a été exécutée avec succès.\n{stdout.decode()}"
 
+        return f"✅ L'administrateur a approuvé et l'action a été exécutée avec succès.\n{stdout.decode()}"

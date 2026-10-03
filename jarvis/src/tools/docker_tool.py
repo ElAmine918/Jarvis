@@ -2,11 +2,12 @@
 Outil Docker v5 — via docker-socket-proxy (pas de socket brut).
 La variable DOCKER_HOST pointe vers le proxy filtré.
 """
+
 import asyncio
 import logging
 import os
 import re
-from typing import Any, Dict
+from typing import Any
 
 from .base import Tool
 
@@ -17,6 +18,7 @@ CONTAINER_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
 # docker-socket-proxy est configuré par DOCKER_HOST dans l'env
 # docker-ce-cli le lira automatiquement
 
+
 def _validate_name(name: str):
     if not CONTAINER_NAME_RE.match(name):
         return f"🚫 Nom invalide : '{name}'."
@@ -26,7 +28,6 @@ def _validate_name(name: str):
 
 
 class DockerTool(Tool):
-
     @property
     def name(self) -> str:
         return "manage_docker"
@@ -42,7 +43,7 @@ class DockerTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "action": {
@@ -50,9 +51,12 @@ class DockerTool(Tool):
                     "enum": ["ps", "logs", "inspect", "start", "restart", "stop"],
                 },
                 "container_name": {"type": "string"},
-                "lines": {"type": "integer", "description": "Lignes de logs (max 200)."}
+                "lines": {
+                    "type": "integer",
+                    "description": "Lignes de logs (max 200).",
+                },
             },
-            "required": ["action"]
+            "required": ["action"],
         }
 
     async def _run(self, *args: str) -> str:
@@ -62,7 +66,7 @@ class DockerTool(Tool):
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env
+                env=env,
             )
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
             out = stdout.decode("utf-8", errors="replace").strip()
@@ -78,13 +82,17 @@ class DockerTool(Tool):
 
     async def _is_manageable(self, name: str) -> bool:
         out = await self._run(
-            "docker", "inspect", name,
-            "--format", '{{index .Config.Labels "jarvis.manageable"}}'
+            "docker",
+            "inspect",
+            name,
+            "--format",
+            '{{index .Config.Labels "jarvis.manageable"}}',
         )
         return out.strip() == "true"
 
-    async def execute(self, action: str, container_name: str = None,
-                      lines: int = 100, **kwargs) -> str:
+    async def execute(
+        self, action: str, container_name: str = None, lines: int = 100, **kwargs
+    ) -> str:
 
         if container_name is not None:
             err = _validate_name(container_name)
@@ -93,15 +101,20 @@ class DockerTool(Tool):
 
         if action == "ps":
             return await self._run(
-                "docker", "ps", "-a",
-                "--format", "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}"
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.Ports}}",
             )
 
         elif action == "logs":
             if not container_name:
                 return "❌ container_name requis."
             lines = min(max(lines, 1), 200)
-            return await self._run("docker", "logs", "--tail", str(lines), container_name)
+            return await self._run(
+                "docker", "logs", "--tail", str(lines), container_name
+            )
 
         elif action == "inspect":
             if not container_name:

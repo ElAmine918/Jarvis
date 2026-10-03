@@ -3,11 +3,12 @@ Outil Web Reader sécurisé.
 Récupère le contenu texte d'une URL.
 Protégé contre les requêtes internes (SSRF).
 """
+
 import ipaddress
 import logging
 import socket
 from html.parser import HTMLParser
-from typing import Any, Dict
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -24,20 +25,20 @@ class HTMLToTextParser(HTMLParser):
         self.in_script_or_style = False
 
     def handle_starttag(self, tag, attrs):
-        if tag in ('script', 'style', 'head', 'meta', 'link'):
+        if tag in ("script", "style", "head", "meta", "link"):
             self.in_script_or_style = True
 
     def handle_endtag(self, tag):
-        if tag in ('script', 'style', 'head', 'meta', 'link'):
+        if tag in ("script", "style", "head", "meta", "link"):
             self.in_script_or_style = False
-        elif tag in ('p', 'br', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'):
-            self.text.append('\n')
+        elif tag in ("p", "br", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li"):
+            self.text.append("\n")
 
     def handle_data(self, data):
         if not self.in_script_or_style:
             text = data.strip()
             if text:
-                self.text.append(text + ' ')
+                self.text.append(text + " ")
 
     def get_text(self):
         return "".join(self.text).strip()
@@ -57,28 +58,29 @@ def _is_safe_url(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
             return False
-            
+
         hostname = parsed.hostname
         if not hostname:
             return False
-            
+
         # Résoudre l'IP pour contrer les DNS rebinding basiques
         ip_address = socket.gethostbyname(hostname)
-        if _is_private_ip(ip_address) or _is_private_ip(hostname): # hostname peut être une IP
+        if _is_private_ip(ip_address) or _is_private_ip(
+            hostname
+        ):  # hostname peut être une IP
             return False
-            
+
         # Bloquer les IP de Tailscale (100.64.0.0/10) explicitement
         ip = ipaddress.ip_address(ip_address)
-        if ip in ipaddress.ip_network('100.64.0.0/10'):
+        if ip in ipaddress.ip_network("100.64.0.0/10"):
             return False
-            
+
         return True
     except Exception:
         return False
 
 
 class WebReaderTool(Tool):
-
     @property
     def name(self) -> str:
         return "read_web_page"
@@ -92,15 +94,15 @@ class WebReaderTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "L'URL complète à lire (ex: https://github.com/...)."
+                    "description": "L'URL complète à lire (ex: https://github.com/...).",
                 }
             },
-            "required": ["url"]
+            "required": ["url"],
         }
 
     async def execute(self, url: str, **kwargs) -> str:
@@ -112,26 +114,26 @@ class WebReaderTool(Tool):
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(url)
                 response.raise_for_status()
-                
+
             parser = HTMLToTextParser()
             parser.feed(response.text)
             text = parser.get_text()
-            
+
             # Nettoyer les sauts de ligne multiples
             import re
-            text = re.sub(r'\n\s*\n', '\n\n', text)
-            
+
+            text = re.sub(r"\n\s*\n", "\n\n", text)
+
             # Tronquer pour ne pas inonder le contexte du modèle
             if len(text) > 8000:
                 return text[:8000] + "\n...[Contenu tronqué]"
             return text or "⚠️ La page ne contient pas de texte lisible."
-            
+
         except Exception as e:
             return f"❌ Erreur lors de la lecture : {e}"
 
 
 class NewsSearchTool(Tool):
-
     @property
     def name(self) -> str:
         return "search_news"
@@ -144,15 +146,15 @@ class NewsSearchTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Le sujet ou pays dont on cherche les actualités récentes (ex: 'canada', 'technologie', 'montreal')."
+                    "description": "Le sujet ou pays dont on cherche les actualités récentes (ex: 'canada', 'technologie', 'montreal').",
                 }
             },
-            "required": ["query"]
+            "required": ["query"],
         }
 
     async def execute(self, query: str, **kwargs) -> str:
@@ -174,8 +176,16 @@ class NewsSearchTool(Tool):
 
             lines = [f"📰 Actualités récentes pour '{query}' :\n"]
             for item in items[:6]:
-                title = item.find("title").text if item.find("title") is not None else "Sans titre"
-                pub_date = item.find("pubDate").text if item.find("pubDate") is not None else ""
+                title = (
+                    item.find("title").text
+                    if item.find("title") is not None
+                    else "Sans titre"
+                )
+                pub_date = (
+                    item.find("pubDate").text
+                    if item.find("pubDate") is not None
+                    else ""
+                )
                 lines.append(f"• {title} ({pub_date})")
 
             return "\n".join(lines)

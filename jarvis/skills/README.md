@@ -38,10 +38,10 @@ Jarvis can search its own history (conversations, tool actions, token stats) via
 
 ```python
 await memory.save_skill(name, description, content)  # UPSERT
-await memory.get_skill(name)                          # Retrieves + increments use_count
-await memory.search_skills(query)                     # SQL LIKE search on name/description
-await memory.save_fact(key, value)                    # UPSERT
-await memory.get_fact(key)                            # Retrieves value by key
+await memory.get_skill(name)  # Retrieves + increments use_count
+await memory.search_skills(query)  # SQL LIKE search on name/description
+await memory.save_fact(key, value)  # UPSERT
+await memory.get_fact(key)  # Retrieves value by key
 ```
 
 ## Limitations

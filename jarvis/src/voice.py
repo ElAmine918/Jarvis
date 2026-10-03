@@ -1,15 +1,16 @@
+import logging
 import os
 import re
 import tempfile
-import logging
-import openai
+
 import edge_tts
 import httpx
-from typing import Optional
+import openai
 
 from .config import GEMINI_MODEL, LOCAL_STT_URL, LOCAL_TTS_URL
 
 logger = logging.getLogger(__name__)
+
 
 async def transcribe_voice(file_bytes: bytes) -> str:
     """
@@ -27,8 +28,12 @@ async def transcribe_voice(file_bytes: bytes) -> str:
                         res = await client.post(
                             f"{LOCAL_STT_URL}/asr",
                             files={"audio_file": audio_file},
-                            data={"output": "txt", "encode": "true", "task": "transcribe"},
-                            timeout=30.0
+                            data={
+                                "output": "txt",
+                                "encode": "true",
+                                "task": "transcribe",
+                            },
+                            timeout=30.0,
                         )
                     if res.status_code == 200:
                         return res.text.strip()
@@ -41,7 +46,7 @@ async def transcribe_voice(file_bytes: bytes) -> str:
     groq_key = os.getenv("GROQ_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY")
-    
+
     if groq_key:
         api_key = groq_key
         base_url = "https://api.groq.com/openai/v1"
@@ -56,19 +61,18 @@ async def transcribe_voice(file_bytes: bytes) -> str:
         model = GEMINI_MODEL
     else:
         return "❌ Aucune clé API (Groq, OpenAI ou Gemini) ou serveur local configuré pour la transcription."
-        
+
     client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
-    
+
     try:
         with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as f:
             f.write(file_bytes)
             temp_path = f.name
-            
+
         try:
             with open(temp_path, "rb") as audio_file:
                 transcript = await client.audio.transcriptions.create(
-                    model=model,
-                    file=audio_file
+                    model=model, file=audio_file
                 )
             return transcript.text
         finally:
@@ -78,11 +82,12 @@ async def transcribe_voice(file_bytes: bytes) -> str:
         logger.error(f"Erreur de transcription : {e}", exc_info=True)
         return "❌ Erreur lors de la transcription."
 
-async def synthesize_speech(text: str) -> Optional[bytes]:
+
+async def synthesize_speech(text: str) -> bytes | None:
     """
     Synthétise le texte en audio avec priorité au modèle local (Piper).
     """
-    clean_text = re.sub(r'[*_`#]', '', text)
+    clean_text = re.sub(r"[*_`#]", "", text)
     if len(clean_text) > 2000:
         clean_text = clean_text[:1997] + "..."
 
@@ -91,9 +96,7 @@ async def synthesize_speech(text: str) -> Optional[bytes]:
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.get(
-                    f"{LOCAL_TTS_URL}/",
-                    params={"text": clean_text},
-                    timeout=30.0
+                    f"{LOCAL_TTS_URL}/", params={"text": clean_text}, timeout=30.0
                 )
                 if res.status_code == 200:
                     return res.content

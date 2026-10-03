@@ -1,9 +1,11 @@
-import logging
 import asyncio
-from typing import Dict, Any
+import logging
+from typing import Any
+
 from .base import Tool
 
 logger = logging.getLogger(__name__)
+
 
 class PythonREPLTool(Tool):
     @property
@@ -19,23 +21,22 @@ class PythonREPLTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "Le code Python à exécuter. Pense à utiliser `print()` pour afficher les résultats."
+                    "description": "Le code Python à exécuter. Pense à utiliser `print()` pour afficher les résultats.",
                 }
             },
             "required": ["code"],
-            "type": "object"
+            "type": "object",
         }
 
     async def execute(self, **kwargs) -> str:
         import os
         import uuid
-        import asyncio
-        
+
         code = kwargs.get("code", "")
 
         # M-08 : Limite de taille du code (50 KB)
@@ -45,7 +46,7 @@ class PythonREPLTool(Tool):
 
         script_name = f"script_{uuid.uuid4().hex[:8]}.py"
         script_path = os.path.join("/app/workspace", script_name)
-        
+
         try:
             with open(script_path, "w") as f:
                 f.write(code)
@@ -58,14 +59,21 @@ class PythonREPLTool(Tool):
             # env={"PATH": ...} → uniquement PATH, toutes les clés API supprimées
             bwrap_cmd = [
                 "bwrap",
-                "--ro-bind", "/", "/",           # fs racine en lecture seule
-                "--dev", "/dev",                  # devices minimaux
-                "--tmpfs", "/tmp",                # /tmp isolé et éphémère
-                "--bind", "/app/workspace", "/app/workspace",  # workspace rw
-                "--unshare-net",                  # PAS de réseau
-                "--unshare-pid",                  # espace PID isolé
-                "--die-with-parent",              # tué si Jarvis meurt
-                "python3", script_path,
+                "--ro-bind",
+                "/",
+                "/",  # fs racine en lecture seule
+                "--dev",
+                "/dev",  # devices minimaux
+                "--tmpfs",
+                "/tmp",  # /tmp isolé et éphémère
+                "--bind",
+                "/app/workspace",
+                "/app/workspace",  # workspace rw
+                "--unshare-net",  # PAS de réseau
+                "--unshare-pid",  # espace PID isolé
+                "--die-with-parent",  # tué si Jarvis meurt
+                "python3",
+                script_path,
             ]
 
             # Garder uniquement PATH (pas de clés API, pas de tokens)
@@ -78,15 +86,17 @@ class PythonREPLTool(Tool):
                 cwd="/app/workspace",
                 env=safe_env,
             )
-            
+
             try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15.0)
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=15.0
+                )
                 output = ""
                 if stdout:
                     output += f"--- STDOUT ---\n{stdout.decode('utf-8')}\n"
                 if stderr:
                     output += f"--- STDERR ---\n{stderr.decode('utf-8')}\n"
-                
+
                 if proc.returncode == 0:
                     return f"✅ Exécution réussie (sandbox bubblewrap — réseau coupé).\n{output}"
                 else:
@@ -94,9 +104,9 @@ class PythonREPLTool(Tool):
             except asyncio.TimeoutError:
                 proc.kill()
                 return "❌ Erreur : Le script a dépassé le temps limite de 15 secondes (boucle infinie ?)."
-                
+
         except Exception as e:
-            return f"❌ Erreur système lors de l'exécution: {str(e)}"
+            return f"❌ Erreur système lors de l'exécution: {e!s}"
         finally:
             if os.path.exists(script_path):
                 os.remove(script_path)

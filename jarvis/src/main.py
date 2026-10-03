@@ -4,15 +4,17 @@ Lance en parallèle :
   - Le bot Telegram (polling)
   - Le serveur FastAPI (pour Open WebUI)
 """
+
 import asyncio
 import logging
 import sys
+
 import uvicorn
 
-from .config import LOG_LEVEL, API_HOST, API_PORT, TELEGRAM_BOT_TOKEN
 from .agent import JarvisAgent
-from .bot import build_app as build_telegram_app
 from .api import app as fastapi_app
+from .bot import build_app as build_telegram_app
+from .config import API_HOST, API_PORT, LOG_LEVEL, TELEGRAM_BOT_TOKEN
 
 # Configuration du logging
 logging.basicConfig(
@@ -57,10 +59,11 @@ async def run_api(agent: JarvisAgent):
 
 from .logger_db import init_db
 
+
 async def main():
     logger.info("🚀 Démarrage de Jarvis...")
     init_db()
-    
+
     # Créer et initialiser l'agent (partagé entre Telegram et l'API)
     agent = JarvisAgent()
     await agent.init()
@@ -68,6 +71,7 @@ async def main():
 
     # Recharger les rappels planifiés survivant au redémarrage
     from .tools.scheduler_tool import SchedulerTool
+
     await SchedulerTool.reload_pending_jobs()
     logger.info("✅ Rappels planifiés rechargés")
 

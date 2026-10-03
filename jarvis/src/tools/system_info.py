@@ -1,24 +1,25 @@
 """
 Outil d'information système — données en lecture seule, sans shell exposé.
 """
+
 import asyncio
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 from .base import Tool
 
 logger = logging.getLogger(__name__)
 
+
 async def _run(*args: str) -> str:
     """Lance un processus avec des arguments FIXES."""
     proc = await asyncio.create_subprocess_exec(
-        *args,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
     return stdout.decode("utf-8", errors="replace").strip()
+
 
 class SystemInfoTool(Tool):
     """Informations système en lecture seule."""
@@ -36,16 +37,24 @@ class SystemInfoTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
                 "query": {
                     "type": "string",
-                    "enum": ["cpu", "memory", "disk", "processes", "containers", "network_ports", "all"],
-                    "description": "Information à récupérer."
+                    "enum": [
+                        "cpu",
+                        "memory",
+                        "disk",
+                        "processes",
+                        "containers",
+                        "network_ports",
+                        "all",
+                    ],
+                    "description": "Information à récupérer.",
                 }
             },
-            "required": ["query"]
+            "required": ["query"],
         }
 
     async def execute(self, query: str = "all", **kwargs) -> str:
@@ -69,7 +78,9 @@ class SystemInfoTool(Tool):
 
         if query in ("disk", "all"):
             try:
-                out = await _run("df", "-h", "--output=source,size,used,avail,pcent,target")
+                out = await _run(
+                    "df", "-h", "--output=source,size,used,avail,pcent,target"
+                )
                 parts.append(f"### Disque\n{out}")
             except Exception as e:
                 parts.append(f"### Disque\n❌ {e}")
@@ -77,19 +88,21 @@ class SystemInfoTool(Tool):
         if query in ("processes", "all"):
             try:
                 out = await _run(
-                    "ps", "aux", "--sort=-%mem",
-                    "--format=pid,pcpu,pmem,comm"
+                    "ps", "aux", "--sort=-%mem", "--format=pid,pcpu,pmem,comm"
                 )
                 lines = out.splitlines()[:15]
-                parts.append(f"### Processus (top 15 par RAM)\n" + "\n".join(lines))
+                parts.append("### Processus (top 15 par RAM)\n" + "\n".join(lines))
             except Exception as e:
                 parts.append(f"### Processus\n❌ {e}")
 
         if query in ("containers", "all"):
             try:
                 out = await _run(
-                    "docker", "ps", "-a",
-                    "--format", "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--format",
+                    "table {{.Names}}\t{{.Status}}\t{{.Image}}",
                 )
                 parts.append(f"### Conteneurs Docker\n{out}")
             except Exception as e:

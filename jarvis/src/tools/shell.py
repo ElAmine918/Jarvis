@@ -3,8 +3,10 @@ ShellTool RETIRÉ — remplacé par des outils spécifiques.
 Ce fichier existe uniquement pour afficher un message clair si l'agent tente
 d'utiliser l'ancien outil.
 """
+
 import logging
-from typing import Any, Dict
+from typing import Any
+
 from .base import Tool
 
 logger = logging.getLogger(__name__)
@@ -26,16 +28,21 @@ class ShellTool(Tool):
         )
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {
             "properties": {
-                "command": {"type": "string", "description": "Ignoré — outil désactivé."}
+                "command": {
+                    "type": "string",
+                    "description": "Ignoré — outil désactivé.",
+                }
             },
-            "required": ["command"]
+            "required": ["command"],
         }
 
     async def execute(self, command: str = "", **kwargs) -> str:
-        logger.warning(f"Tentative d'utilisation de l'outil shell désactivé: {command!r}")
+        logger.warning(
+            f"Tentative d'utilisation de l'outil shell désactivé: {command!r}"
+        )
         return (
             "🚫 L'outil shell générique est désactivé. "
             "Utilise `system_info` (cpu, memory, disk, processes, containers), "
