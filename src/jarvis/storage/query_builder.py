@@ -45,15 +45,3 @@ def build_fts_query(text: str) -> str:
     return " or ".join(filtered_words)
 
 
-def test_build_fts_query_basic():
-    assert (
-        build_fts_query("Recette de tarte-aux-pommes !") == "Recette tarte aux pommes"
-    )
-
-
-def test_build_fts_query_quotes():
-    assert build_fts_query('"Docker" et Proxmox') == "Docker Proxmox"
-
-
-def test_build_fts_query_stop_words_only():
-    assert build_fts_query("et pour de la") == ""

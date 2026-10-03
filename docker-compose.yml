@@ -235,7 +235,7 @@ services:
     - maintenance_work_mem=256MB
     volumes:
     - jarvis-db-data:/var/lib/postgresql/data
-    - ./jarvis/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     networks:
     - jarvis-net
     deploy:

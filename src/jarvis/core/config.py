@@ -46,6 +46,7 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 # --- Chemins des données (pour Docker) ---
 SKILLS_DIR = os.getenv("SKILLS_DIR", "/app/data/skills")
 MEMORY_DB_PATH = os.getenv("MEMORY_DB_PATH", "/app/data/memory.db")
+LOGS_DB_PATH = os.getenv("LOGS_DB_PATH", "/app/data/logs.db")
 WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", "/app/workspace")
 
 # --- Serveur API interne (pour Open WebUI) ---

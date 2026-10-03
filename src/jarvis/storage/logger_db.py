@@ -4,7 +4,9 @@ import sqlite3
 import uuid
 from typing import Any
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "logs.db")
+import os
+from jarvis.core.config import LOGS_DB_PATH
+DB_PATH = LOGS_DB_PATH
 
 
 def init_db():
