@@ -477,7 +477,7 @@ async def admin_api_data(_=Depends(verify_admin)):
     ollama_up = await check_endpoint(OLLAMA_LOCAL_URL, 0.5)
     
     return {
-        "tools_count": len(get_default_registry().get_all_tools()),
+        "tools_count": len(get_default_registry()._tools),
         "conversations": convs,
         "actions": acts,
         "backends": {
