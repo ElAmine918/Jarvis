@@ -62,7 +62,7 @@ class EdgeTTSChunkedStream(tts.ChunkedStream):
 
 
 class EdgeTTS(tts.TTS):
-    def __init__(self, voice: str = "fr-FR-HenriNeural"):
+    def __init__(self, voice: str = "fr-FR-RemyMultilingualNeural"):
         super().__init__(
             capabilities=tts.TTSCapabilities(streaming=False),
             sample_rate=24000,
@@ -130,17 +130,19 @@ async def entrypoint(ctx: JobContext):
             model=model_id,
         )
 
-    # 3. TTS (Synthèse vocale gratuite EdgeTTS Henri Neural)
-    tts_plugin = EdgeTTS(voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-HenriNeural"))
+    # 3. TTS (Synthèse vocale gratuite EdgeTTS Remy Multilingual)
+    tts_plugin = EdgeTTS(voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-RemyMultilingualNeural"))
 
     # Contexte & Personnalité Jarvis
     chat_ctx = llm.ChatContext().append(
         role="system",
         text=(
-            "Tu es Jarvis, l'intendant IA personnel et distingué de Monsieur. "
-            "Tu t'exprimes avec élégance, clarté et précision en français. "
-            "Tes réponses orales doivent être concises, percutantes et naturelles, adaptées à une conversation vocale en direct. "
-            "Ne sois jamais bavard inutilement."
+            "Tu es Jarvis, un assistant IA vocal d'élite, intelligent, distingué et bienveillant. "
+            "Tu t'exprimes en français avec une diction naturelle, chaleureuse et fluide. "
+            "RÈGLES D'OR DE CONVERSATION : "
+            "1. Ne répète JAMAIS le mot 'Monsieur' à tout bout de champ (évite-le ou utilise-le de façon rarissime). "
+            "2. Fais des phrases courtes, directes et percutantes, adaptées à un échange vocal en direct. "
+            "3. Pas de listes à puces ni de formatage écrit complexe. Va droit au but sans bavardage superflu."
         ),
     )
 
@@ -156,7 +158,7 @@ async def entrypoint(ctx: JobContext):
     assistant.start(ctx.room, participant)
     await asyncio.sleep(1)
     await assistant.say(
-        "Bonjour Monsieur. C'est Jarvis. Je suis en ligne et prêt à vous assister.",
+        "Bonjour, c'est Jarvis. Je suis en ligne et prêt à vous assister. Que puis-je faire pour vous ?",
         allow_interruptions=True,
     )
 

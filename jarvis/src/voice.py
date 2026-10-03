@@ -101,7 +101,7 @@ async def synthesize_speech(text: str) -> Optional[bytes]:
             logger.error(f"Erreur TTS Local: {e}. Fallback vers Edge-TTS...")
 
     try:
-        communicate = edge_tts.Communicate(clean_text, "fr-FR-HenriNeural")
+        communicate = edge_tts.Communicate(clean_text, "fr-FR-RemyMultilingualNeural")
         audio_data = b""
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
