@@ -60,6 +60,7 @@ OLLAMA_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "qwen2.5:7b")
 
 # --- Voice (STT/TTS) ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 VOICE_TTS_ENABLED = os.getenv("VOICE_TTS_ENABLED", "true").lower() == "true"
 # --- Local Voice ---
 LOCAL_STT_URL = os.getenv("LOCAL_STT_URL", "")

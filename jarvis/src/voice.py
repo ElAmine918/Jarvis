@@ -38,18 +38,26 @@ async def transcribe_voice(file_bytes: bytes) -> str:
         except Exception as e:
             logger.error(f"Erreur STT Local: {e}. Fallback vers Cloud...")
 
+    groq_key = os.getenv("GROQ_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY")
     
-    if not openai_key and not gemini_key:
-        return "❌ Aucune clé API (OpenAI ou Gemini) ou serveur local configuré pour la transcription."
+    if groq_key:
+        api_key = groq_key
+        base_url = "https://api.groq.com/openai/v1"
+        model = "whisper-large-v3-turbo"
+    elif openai_key:
+        api_key = openai_key
+        base_url = None
+        model = "whisper-1"
+    elif gemini_key:
+        api_key = gemini_key
+        base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        model = GEMINI_MODEL
+    else:
+        return "❌ Aucune clé API (Groq, OpenAI ou Gemini) ou serveur local configuré pour la transcription."
         
-    use_gemini = not openai_key
-    api_key = gemini_key if use_gemini else openai_key
-    base_url = "https://generativelanguage.googleapis.com/v1beta/openai/" if use_gemini else None
-    
     client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
-    model = GEMINI_MODEL if use_gemini else "whisper-1"
     
     try:
         with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as f:
