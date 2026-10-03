@@ -348,11 +348,9 @@ DASHBOARD_HTML = """
         const { createApp } = Vue
 
         
-        window.onerror = function(msg, src, lineno, colno, error) {
-            document.getElementById('error-overlay').style.display = 'block';
-            document.getElementById('error-message').innerText += '\n' + msg + '\n' + (error ? error.stack : '');
-        };
-        const app = createApp({
+        const { createApp } = Vue
+
+        createApp({
 
             data() {
                 return {
@@ -433,14 +431,7 @@ DASHBOARD_HTML = """
                     return marked.parse(text);
                 }
             }
-        })
-
-        app.config.errorHandler = function(err, vm, info) {
-            document.getElementById('error-overlay').style.display = 'block';
-            document.getElementById('error-message').innerText += '\nVue Error: ' + err.toString() + '\nInfo: ' + info + '\nStack: ' + err.stack;
-            console.error(err);
-        };
-        app.mount('#app')
+        }).mount('#app')
 
     </script>
     <style>
