@@ -36,7 +36,7 @@ services:
         max-file: '2'
   jarvis:
     build:
-      context: ./jarvis
+      context: .
       dockerfile: Dockerfile
     container_name: jarvis
     restart: unless-stopped
@@ -48,7 +48,7 @@ services:
     volumes:
     - jarvis-data:/app/data
     - jarvis-workspace:/app/workspace
-    - ./jarvis/src:/app/src:ro
+    - ./src/jarvis:/app/jarvis:ro
     networks:
     - jarvis-net
     - docker-proxy-net
@@ -181,12 +181,12 @@ services:
         max-file: '2'
   jarvis-live:
     build:
-      context: ./jarvis
+      context: .
       dockerfile: Dockerfile
     container_name: jarvis-live
     restart: unless-stopped
     env_file: .env
-    command: python3 src/live_agent.py start
+    command: python3 -m jarvis.interfaces.live_agent start
     healthcheck:
       disable: true
     networks:

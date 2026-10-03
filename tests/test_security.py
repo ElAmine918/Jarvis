@@ -9,9 +9,9 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.tools.filesystem import FileSystemTool, _safe_path, WORKSPACE
-from src.tools.docker_tool import DockerTool, _validate_name
-from src.tools.shell import ShellTool
+from jarvis.tools.filesystem import FileSystemTool, _safe_path, WORKSPACE
+from jarvis.tools.docker_tool import DockerTool, _validate_name
+from jarvis.tools.shell import ShellTool
 
 
 class TestShellDisabled:
