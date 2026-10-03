@@ -247,20 +247,40 @@ async def entrypoint(ctx: JobContext):
         stt_plugin = openai.STT(language="fr")
 
     # 2. LLM (Cerveau)
-    if groq_api_key:
-        logger.info("Utilisation de Groq Qwen-27B pour le LLM vocal (faible latence)")
+    import httpx
+    
+    # Test OpenRouter/Groq first, fallback to Ollama if they are down/out of credits
+    async def check_api(url, key):
+        if not key: return False
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(f"{url.replace('/chat/completions', '').replace('/v1', '')}/v1/models", headers={"Authorization": f"Bearer {key}"}, timeout=2.0)
+                return res.status_code == 200
+        except Exception:
+            return False
+
+    if groq_api_key and await check_api("https://api.groq.com/openai", groq_api_key):
+        logger.info("Utilisation de Groq pour le LLM vocal (faible latence)")
         custom_llm = openai.LLM(
             base_url="https://api.groq.com/openai/v1",
             api_key=groq_api_key,
             model="qwen/qwen3.8-27b",
         )
-    else:
+    elif openrouter_api_key and await check_api("https://openrouter.ai/api", openrouter_api_key):
+        logger.info("Utilisation de OpenRouter pour le LLM vocal")
         base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
         model_id = os.getenv("OPENROUTER_MODEL", "qwen/qwen3.8-27b:free")
         custom_llm = openai.LLM(
             base_url=base_url,
             api_key=openrouter_api_key,
             model=model_id,
+        )
+    else:
+        logger.warning("⚠️ API Cloud inaccessibles ou sans crédits. Fallback LOCAL sur Ollama pour la voix !")
+        custom_llm = openai.LLM(
+            base_url=OLLAMA_LOCAL_URL,
+            api_key="ollama",
+            model=os.getenv("OLLAMA_LOCAL_MODEL", "qwen2.5:7b"),
         )
 
     # 3. TTS (Synthèse vocale : ElevenLabs en priorité, sinon EdgeTTS)
