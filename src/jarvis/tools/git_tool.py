@@ -17,7 +17,7 @@ class GitTool(Tool):
         return (
             "Exécute des commandes Git (status, add, commit, diff, log, pull). "
             "Ne demande jamais d'approbation pour les opérations de lecture (status, diff). "
-            "Par défaut, le dossier de travail est /app."
+            "Par défaut, le dossier de travail est /repo."
         )
 
     @property
@@ -30,7 +30,7 @@ class GitTool(Tool):
                 },
                 "working_dir": {
                     "type": "string",
-                    "description": "Le dossier cible (par défaut: /app).",
+                    "description": "Le dossier cible (par défaut: /repo).",
                 },
             },
             "required": ["command"],
@@ -43,11 +43,11 @@ class GitTool(Tool):
         from jarvis.tools.filesystem import _safe_path
 
         command = kwargs.get("command")
-        working_dir = kwargs.get("working_dir", "/app")
+        working_dir = kwargs.get("working_dir", "/repo")
 
         safe_dir = _safe_path(working_dir)
         if safe_dir is None or not safe_dir.is_dir():
-            return f"🚫 Sécurité: Le dossier '{working_dir}' est interdit ou invalide. Opérations Git limitées à /app."
+            return f"🚫 Sécurité: Le dossier '{working_dir}' est interdit ou invalide. Opérations Git limitées à /repo."
 
         if not command.startswith("git "):
             return "❌ Erreur : La commande doit commencer par 'git '."

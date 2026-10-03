@@ -12,7 +12,7 @@ from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_PATHS = [Path("/app/workspace").resolve(), Path("/app/jarvis/tools").resolve()]
+ALLOWED_PATHS = [Path("/app/workspace").resolve(), Path("/app/jarvis/tools").resolve(), Path("/repo").resolve()]
 
 
 def _safe_path(raw: str) -> Path | None:
