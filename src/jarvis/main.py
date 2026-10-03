@@ -17,6 +17,10 @@ from jarvis.interfaces.api import app as fastapi_app
 from jarvis.interfaces.bot import build_app as build_telegram_app
 
 # Configuration du logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
