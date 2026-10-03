@@ -37,7 +37,7 @@ class SelfImproveTool(Tool):
         tool_name = kwargs.get("tool_name", "").replace(".py", "")
         code = kwargs.get("code", "")
         
-        target_path = f"/app/jarvis/tools/{tool_name}.py"
+        target_path = f"/repo/src/jarvis/tools/{tool_name}.py"
         
         # --- ÉTAPE 1 : AUDIT ISOLÉ (L'INSPECTEUR) ---
         from jarvis.core.agent import JarvisAgent
@@ -69,8 +69,8 @@ class SelfImproveTool(Tool):
             
         # On vérifie que la syntaxe est bonne et que les tests globaux (sécurité/imports) passent
         proc = await asyncio.create_subprocess_shell(
-            "PYTHONPATH=/app pytest /app/tests/test_security.py",
-            cwd="/app",
+            "PYTHONPATH=/repo/src pytest /repo/tests/test_security.py",
+            cwd="/repo",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -81,11 +81,11 @@ class SelfImproveTool(Tool):
             
         # --- ÉTAPE 3 : DÉPLOIEMENT GITHUB ---
         # On configure l'identité Git si elle ne l'est pas
-        await asyncio.create_subprocess_shell("git config --global user.name 'Jarvis AI' && git config --global user.email 'jarvis@localhost'", cwd="/app")
+        await asyncio.create_subprocess_shell("git config --global user.name 'Jarvis AI' && git config --global user.email 'jarvis@localhost'", cwd="/repo")
         
         push_proc = await asyncio.create_subprocess_shell(
             f"git add src/jarvis/tools/{tool_name}.py && git commit -m 'feat(auto): création/mise à jour de l\'outil {tool_name}' && git push origin main",
-            cwd="/app",
+            cwd="/repo",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
