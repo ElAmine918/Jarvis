@@ -5,12 +5,124 @@ import re
 from typing import Optional
 
 import edge_tts
+import httpx
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli, llm, tts, utils
 from livekit.agents.types import APIConnectOptions
 from livekit.agents.voice_assistant import VoiceAssistant
 from livekit.plugins import openai, silero
 
 logger = logging.getLogger("jarvis-live")
+
+
+def sanitize_speech_text(text: str) -> str:
+    """Nettoie le texte avant synthèse vocale : filtre anti-Monsieur absolu et markdown."""
+    text = re.sub(r'(?i)\b(monsieur)\b', '', text)
+    text = re.sub(r'[*_`#~]', '', text)
+    text = re.sub(r',\s*([?!.])', r'\1', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r'^[,\s.-]+|[,\s.-]+$', '', text).strip()
+    if text and text[0].islower():
+        text = text[0].upper() + text[1:]
+    return text
+
+
+class ElevenLabsChunkedStream(tts.ChunkedStream):
+    def __init__(
+        self,
+        *,
+        tts_instance: tts.TTS,
+        input_text: str,
+        voice: str,
+        api_key: str,
+        model_id: str = "eleven_multilingual_v2",
+        conn_options: Optional[APIConnectOptions] = None,
+    ):
+        super().__init__(tts=tts_instance, input_text=input_text, conn_options=conn_options)
+        self._voice = voice
+        self._api_key = api_key
+        self._model_id = model_id
+
+    async def _run(self) -> None:
+        request_id = utils.shortuuid()
+        decoder = utils.codecs.AudioStreamDecoder(
+            sample_rate=self._tts.sample_rate,
+            num_channels=self._tts.num_channels,
+        )
+
+        clean_text = sanitize_speech_text(self.input_text)
+        if not clean_text:
+            return
+
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{self._voice}/stream?output_format=mp3_44100_128"
+        headers = {
+            "xi-api-key": self._api_key,
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "text": clean_text,
+            "model_id": self._model_id,
+        }
+
+        async def _stream_producer():
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with client.stream("POST", url, headers=headers, json=payload) as response:
+                        if response.status_code != 200:
+                            err_body = await response.aread()
+                            logger.error(f"Erreur ElevenLabs ({response.status_code}): {err_body.decode(errors='ignore')}")
+                            return
+                        async for chunk in response.aiter_bytes():
+                            decoder.push(chunk)
+            except Exception as e:
+                logger.error(f"Exception flux ElevenLabs: {e}")
+            finally:
+                decoder.end_input()
+
+        producer_task = asyncio.create_task(_stream_producer())
+
+        try:
+            emitter = tts.SynthesizedAudioEmitter(
+                event_ch=self._event_ch,
+                request_id=request_id,
+            )
+            async for frame in decoder:
+                emitter.push(frame)
+            emitter.flush()
+        finally:
+            await utils.aio.gracefully_cancel(producer_task)
+            await decoder.aclose()
+
+
+class ElevenLabsTTS(tts.TTS):
+    def __init__(
+        self,
+        voice: str = "nPczCjzI2devNBz1zQrb",  # Brian (voix officielle studio)
+        api_key: str = "",
+        model_id: str = "eleven_multilingual_v2",
+    ):
+        super().__init__(
+            capabilities=tts.TTSCapabilities(streaming=False),
+            sample_rate=24000,
+            num_channels=1,
+        )
+        self._voice = voice
+        self._api_key = api_key
+        self._model_id = model_id
+
+    def synthesize(
+        self,
+        text: str,
+        *,
+        conn_options: Optional[APIConnectOptions] = None,
+    ) -> tts.ChunkedStream:
+        return ElevenLabsChunkedStream(
+            tts_instance=self,
+            input_text=text,
+            voice=self._voice,
+            api_key=self._api_key,
+            model_id=self._model_id,
+            conn_options=conn_options,
+        )
 
 
 class EdgeTTSChunkedStream(tts.ChunkedStream):
@@ -32,7 +144,7 @@ class EdgeTTSChunkedStream(tts.ChunkedStream):
             num_channels=self._tts.num_channels,
         )
 
-        clean_text = re.sub(r'[*_`#~]', '', self.input_text).strip()
+        clean_text = sanitize_speech_text(self.input_text)
         if not clean_text:
             return
 
@@ -96,6 +208,8 @@ async def entrypoint(ctx: JobContext):
     groq_api_key = os.getenv("GROQ_API_KEY", "")
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
     openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    eleven_api_key = os.getenv("ELEVEN_API_KEY", "") or os.getenv("ELEVENLABS_API_KEY", "")
+    eleven_voice_id = os.getenv("ELEVEN_VOICE_ID", "nPczCjzI2devNBz1zQrb")  # Brian par défaut
 
     # 1. STT (Écoute / Transcription)
     if groq_api_key:
@@ -130,19 +244,28 @@ async def entrypoint(ctx: JobContext):
             model=model_id,
         )
 
-    # 3. TTS (Synthèse vocale gratuite EdgeTTS Remy Multilingual)
-    tts_plugin = EdgeTTS(voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-RemyMultilingualNeural"))
+    # 3. TTS (Synthèse vocale : ElevenLabs en priorité, sinon EdgeTTS)
+    if eleven_api_key:
+        logger.info(f"Utilisation d'ElevenLabs pour la voix (Voix: {eleven_voice_id})")
+        tts_plugin = ElevenLabsTTS(
+            voice=eleven_voice_id,
+            api_key=eleven_api_key,
+            model_id="eleven_multilingual_v2",
+        )
+    else:
+        logger.info("ElevenLabs non configuré -> Utilisation d'EdgeTTS (Remy Multilingual)")
+        tts_plugin = EdgeTTS(voice=os.getenv("VOICE_LIVE_TTS", "fr-FR-RemyMultilingualNeural"))
 
     # Contexte & Personnalité Jarvis
     chat_ctx = llm.ChatContext().append(
         role="system",
         text=(
-            "Tu es Jarvis, un assistant IA vocal d'élite, intelligent, distingué et bienveillant. "
-            "Tu t'exprimes en français avec une diction naturelle, chaleureuse et fluide. "
-            "RÈGLES D'OR DE CONVERSATION : "
-            "1. Ne répète JAMAIS le mot 'Monsieur' à tout bout de champ (évite-le ou utilise-le de façon rarissime). "
-            "2. Fais des phrases courtes, directes et percutantes, adaptées à un échange vocal en direct. "
-            "3. Pas de listes à puces ni de formatage écrit complexe. Va droit au but sans bavardage superflu."
+            "Tu es Jarvis, un assistant IA vocal d'élite, ultra-intelligent, posé et moderne. "
+            "Tu t'exprimes en français avec un ton direct, naturel et chaleureux. "
+            "RÈGLES STRICTES DE DIALOGUE ORAL : "
+            "1. Interdiction absolue d'utiliser le mot 'Monsieur' sous quelque forme que ce soit. Parle directement à ton interlocuteur. "
+            "2. Tes réponses doivent être très courtes (1 à 2 phrases percutantes), adaptées à une vraie conversation téléphonique. "
+            "3. Pas de listes à puces, pas de formules d'obséquiosité, va droit au but."
         ),
     )
 
