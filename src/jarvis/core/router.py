@@ -269,7 +269,7 @@ async def get_all_backends(history: list = None) -> list:
                     "model": m,
                     "score": stats["score"],
                     "speed": stats["speed"],
-                    "tier": 1,
+                    "tier": 2,
                 }
             )
 
@@ -292,7 +292,7 @@ async def get_all_backends(history: list = None) -> list:
                     "model": m,
                     "score": stats["score"],
                     "speed": stats["speed"],
-                    "tier": 2,
+                    "tier": 1,
                 }
             )
 
