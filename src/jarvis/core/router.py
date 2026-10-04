@@ -32,6 +32,16 @@ def get_model_stats(model_name: str) -> dict:
             stats = {"score": 92, "speed": "slow"}
         elif "flash" in name_lower:
             stats = {"score": 88, "speed": "fast"}
+    # LLaMA (Groq / Local)
+    elif "llama" in name_lower or "llama3" in name_lower:
+        if "70b" in name_lower or "405b" in name_lower:
+            stats = {"score": 90, "speed": "fast"}
+        else:
+            stats = {"score": 75, "speed": "fast"}
+    # Mixtral (Groq / Local)
+    elif "mixtral" in name_lower:
+        stats = {"score": 85, "speed": "fast"}
+    # Qwen
     # Qwen
     elif "qwen" in name_lower:
         if (
@@ -166,6 +176,42 @@ _openrouter_models_cache = []
 _openrouter_models_cache_time = 0
 
 
+_groq_models_cache = []
+_groq_models_cache_time = 0
+
+async def get_dynamic_groq_models(api_key: str, primary_model: str) -> list:
+    global _groq_models_cache, _groq_models_cache_time
+    import time
+    if _groq_models_cache and (time.time() - _groq_models_cache_time) < 3600:
+        models = _groq_models_cache
+    else:
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=4.0
+                )
+                if res.status_code == 200:
+                    models = []
+                    for m in res.json().get("data", []):
+                        name = m.get("id", "")
+                        # Filter out whisper (audio) and pure safeguard models
+                        if "whisper" not in name and "safeguard" not in name and "guard" not in name:
+                            models.append(name)
+                    _groq_models_cache = models
+                    _groq_models_cache_time = time.time()
+                else:
+                    models = []
+        except Exception:
+            models = []
+
+    final_models = [primary_model] if primary_model else []
+    for m in models:
+        if m not in final_models:
+            final_models.append(m)
+    return final_models
+
 async def get_dynamic_openrouter_models(api_key: str, primary_model: str) -> list:
     global _openrouter_models_cache, _openrouter_models_cache_time
     if (
@@ -247,7 +293,30 @@ async def get_all_backends(history: list = None) -> list:
                 }
             )
 
-    # 2. Collecter OpenRouter
+# 2.a. Collecter Groq
+    from jarvis.core.config import GROQ_API_KEY
+    if GROQ_API_KEY:
+        groq_client = AsyncOpenAI(
+            base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY
+        )
+        groq_models = await get_dynamic_groq_models(GROQ_API_KEY, "")
+        for m in groq_models:
+            if m in _dead_models and current_time < _dead_models[m]:
+                continue
+            stats = get_model_stats(m)
+            # Groq is incredibly fast, so speed is 'fast' and tier is 1.5
+            available_pool.append(
+                {
+                    "name": f"Groq ({m})",
+                    "client": groq_client,
+                    "model": m,
+                    "score": stats["score"],
+                    "speed": "fast",
+                    "tier": 1.5,
+                }
+            )
+
+    # 2.b. Collecter OpenRouter
     if OPENROUTER_API_KEY:
         or_client = AsyncOpenAI(
             base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY
