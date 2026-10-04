@@ -140,51 +140,25 @@ _gemini_models_cache_time = 0
 
 
 async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
-    global _gemini_models_cache, _gemini_models_cache_time
-    if _gemini_models_cache and (time.time() - _gemini_models_cache_time) < 3600:
-        models = _gemini_models_cache
-    else:
-        try:
-            async with httpx.AsyncClient() as client:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-                res = await client.get(url, timeout=3.0)
-                if res.status_code == 200:
-                    models = []
-                    for m in res.json().get("models", []):
-                        name = m.get("name", "").replace("models/", "")
-                        name_lower = name.lower()
-                        if "generateContent" in m.get("supportedGenerationMethods", []):
-                            if (
-                                ("flash" in name_lower or "pro" in name_lower)
-                                and "image" not in name_lower
-                                and "tts" not in name_lower
-                                and "lite" not in name_lower
-                            ):
-                                models.append(name)
-                    _gemini_models_cache = models
-                    _gemini_models_cache_time = time.time()
-                else:
-                    models = []
-        except Exception as e:
-            logger.warning(
-                f"Impossible de récupérer dynamiquement les modèles Gemini : {e}"
-            )
-            models = []
-
-    if not models:
-        models = [
-            "gemini-3.5-flash",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-3.1-pro-preview",
-        ]
-
-    final_models = [primary_model]
+    # Explicit list of text-out models from user dashboard (excluding lite)
+    models = [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-pro",
+        "gemini-3.0-flash",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash"
+    ]
+    
+    final_models = [primary_model] if primary_model and primary_model not in models else []
     for m in models:
-        if m not in final_models:
-            final_models.append(m)
-
+        final_models.append(m)
+        
     return final_models
 
 
