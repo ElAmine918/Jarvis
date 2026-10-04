@@ -23,7 +23,7 @@ async def get_db_pool():
 
 async def generate_embedding(text: str) -> list[float]:
     """
-    Génère un embedding (768 dimensions) via Gemini (priorité) ou LM Studio (nomic).
+    Génère un embedding (768 dimensions) via Gemini (priorité) ou Ollama local (nomic).
     """
     if GEMINI_API_KEY:
         try:
@@ -36,7 +36,7 @@ async def generate_embedding(text: str) -> list[float]:
                 if res.status_code == 200:
                     return res.json()["embedding"]["values"]
         except Exception as e:
-            logger.warning(f"Erreur Gemini Embedding: {e}. Fallback LM Studio...")
+            logger.warning(f"Erreur Gemini Embedding: {e}. Fallback Ollama...")
 
     if OLLAMA_LOCAL_URL:
         try:
@@ -49,22 +49,9 @@ async def generate_embedding(text: str) -> list[float]:
                 if res.status_code == 200:
                     return res.json()["data"][0]["embedding"]
         except Exception as e:
-            logger.warning(f"Erreur Ollama Embedding: {e}")
-
-    if LM_STUDIO_URL:
-        try:
-            async with httpx.AsyncClient() as client:
-                res = await client.post(
-                    f"{LM_STUDIO_URL}/embeddings",
-                    json={"model": "text-embedding-nomic-embed-text-v1.5", "input": text},
-                    timeout=5.0
-                )
-                if res.status_code == 200:
-                    return res.json()["data"][0]["embedding"]
-        except Exception as e:
-            logger.error(f"Erreur LM Studio Embedding: {e}")
+            logger.error(f"Erreur Ollama Embedding: {e}")
             
-    raise Exception("Impossible de générer l'embedding (aucun fournisseur n'est disponible).")
+    raise Exception("Impossible de générer l'embedding (ni Gemini ni Ollama ne sont disponibles).")
 
 async def ingest_message(pool, source: str, conversation_id: str, message_id: str, role: str, content: str, seq: int):
     """
