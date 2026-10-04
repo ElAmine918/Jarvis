@@ -44,7 +44,7 @@ case "$1" in
         scp jarvis_update.tar.gz pve:/tmp/
 
         echo -e "${CYAN}🐳 [3/4] Déploiement dans LXC 100, reconstruction et relance du conteneur...${NC}"
-        ssh pve 'pct push 100 /tmp/jarvis_update.tar.gz /tmp/jarvis_update.tar.gz && pct exec 100 -- bash -c "tar -xzf /tmp/jarvis_update.tar.gz -C /app && rm /tmp/jarvis_update.tar.gz && cd /app && docker compose up -d --build"'
+        ssh pve 'pct push 100 /tmp/jarvis_update.tar.gz /tmp/jarvis_update.tar.gz && pct exec 100 -- bash -c "tar -xzf /tmp/jarvis_update.tar.gz -C /app && rm /tmp/jarvis_update.tar.gz && chown -R 1001:1001 /app && cd /app && docker compose up -d --build"'
 
         echo -e "${YELLOW}🧹 [4/4] Suppression de l'archive locale...${NC}"
         rm -f jarvis_update.tar.gz
