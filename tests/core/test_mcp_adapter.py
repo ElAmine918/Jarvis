@@ -1,6 +1,9 @@
 import json
+import os
+from unittest.mock import patch
 import pytest
-from jarvis.core.mcp_adapter import DynamicMCPTool, load_mcp_servers
+
+from jarvis.core.mcp_adapter import DynamicMCPTool, get_mcp_config_path, load_mcp_servers
 from jarvis.tools.base import ToolRegistry
 
 
@@ -37,7 +40,7 @@ async def test_dynamic_mcp_tool_custom_handler():
     assert res == "Result: 42"
 
 
-def test_load_mcp_servers(tmp_path):
+def test_load_mcp_servers_with_and_without_tools(tmp_path):
     config = {
         "mcpServers": {
             "filesystem_server": {
@@ -58,7 +61,39 @@ def test_load_mcp_servers(tmp_path):
     cfg_file.write_text(json.dumps(config), encoding="utf-8")
 
     registry = ToolRegistry()
-    loaded_count = load_mcp_servers(registry, config_path=str(cfg_file))
-    assert loaded_count == 2
+    count = load_mcp_servers(registry, config_path=str(cfg_file))
+    assert count == 2
     assert "mcp_list_files" in registry._tools
     assert "mcp_empty_server" in registry._tools
+
+
+def test_load_mcp_servers_missing_file():
+    registry = ToolRegistry()
+    count = load_mcp_servers(registry, config_path="/non_existent_file.json")
+    assert count == 0
+
+
+def test_load_mcp_servers_corrupted_json(tmp_path):
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("NOT A VALID JSON", encoding="utf-8")
+    registry = ToolRegistry()
+    count = load_mcp_servers(registry, config_path=str(bad_file))
+    assert count == 0
+
+
+def test_get_mcp_config_path_env_var(tmp_path):
+    custom_cfg = tmp_path / "custom_mcp.json"
+    custom_cfg.write_text("{}", encoding="utf-8")
+    with patch.dict(os.environ, {"MCP_CONFIG_PATH": str(custom_cfg)}):
+        path = get_mcp_config_path()
+        assert path == custom_cfg
+
+
+def test_get_mcp_config_path_none():
+    with (
+        patch.dict(os.environ, {"MCP_CONFIG_PATH": ""}),
+        patch("os.path.exists", return_value=False),
+        patch("pathlib.Path.exists", return_value=False),
+    ):
+        path = get_mcp_config_path()
+        assert path is None

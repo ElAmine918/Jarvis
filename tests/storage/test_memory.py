@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from jarvis.storage.memory import MemoryManager
 
@@ -57,3 +58,24 @@ async def test_memory_facts_crud(mem):
     await mem.save_fact("owner_name", "Monsieur Amine")
     updated = await mem.get_fact("owner_name")
     assert updated == "Monsieur Amine"
+
+
+@pytest.mark.asyncio
+async def test_memory_error_paths(mem):
+    # Pass an invalid db_path that causes sqlite connection to fail
+    mem_bad = MemoryManager(db_path="/non_existent_dir_123/sub/bad.db")
+
+    err_save_skill = await mem_bad.save_skill("s", "d", "c")
+    assert "Erreur lors de la sauvegarde" in err_save_skill
+
+    err_get_skill = await mem_bad.get_skill("s")
+    assert err_get_skill is None
+
+    err_search_skills = await mem_bad.search_skills("query")
+    assert err_search_skills == []
+
+    err_save_fact = await mem_bad.save_fact("k", "v")
+    assert "Erreur lors de la sauvegarde" in err_save_fact
+
+    err_get_fact = await mem_bad.get_fact("k")
+    assert err_get_fact is None

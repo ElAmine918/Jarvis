@@ -77,6 +77,60 @@ def test_chat_completions_non_streaming(client):
             assert data["choices"][0]["message"]["content"] == "Réponse test de l'agent"
 
 
+def test_chat_completions_streaming(client):
+    with patch("jarvis.interfaces.api._API_KEY", ""):
+        payload = {
+            "model": "jarvis-auto",
+            "messages": [{"role": "user", "content": "Bonjour Jarvis streaming"}],
+            "stream": True,
+        }
+        with patch("jarvis.storage.logger_db.log_conversation"):
+            response = client.post("/v1/chat/completions", json=payload)
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers["content-type"]
+            text = response.text
+            assert "data: " in text
+            assert "[DONE]" in text
+            assert ("Réponse test de l'agent" in text or "R\\u00e9ponse test de l'agent" in text)
+
+
+def test_chat_completions_streaming_error(client):
+    async def mock_error_gen(*args, **kwargs):
+        raise RuntimeError("Agent stream boom")
+        yield "never"
+
+    app.state.agent.process_message = mock_error_gen
+
+    with patch("jarvis.interfaces.api._API_KEY", ""):
+        payload = {
+            "model": "jarvis-auto",
+            "messages": [{"role": "user", "content": "Bonjour crash"}],
+            "stream": True,
+        }
+        response = client.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 200
+        assert "server_error" in response.text
+        assert "[DONE]" in response.text
+
+
+def test_chat_completions_non_streaming_error(client):
+    async def mock_error_gen(*args, **kwargs):
+        raise RuntimeError("Agent non-stream boom")
+        yield "never"
+
+    app.state.agent.process_message = mock_error_gen
+
+    with patch("jarvis.interfaces.api._API_KEY", ""):
+        payload = {
+            "model": "jarvis-auto",
+            "messages": [{"role": "user", "content": "Bonjour crash"}],
+            "stream": False,
+        }
+        response = client.post("/v1/chat/completions", json=payload)
+        assert response.status_code == 500
+        assert "Erreur interne" in response.json()["detail"]
+
+
 def test_admin_dashboard_auth(client):
     with patch("jarvis.interfaces.cli_admin.ADMIN_PASSWORD", "test_admin_pass"):
         # Unauthenticated request
@@ -87,3 +141,4 @@ def test_admin_dashboard_auth(client):
         res_auth = client.get("/admin", auth=("admin", "test_admin_pass"))
         assert res_auth.status_code == 200
         assert "JARVIS OS" in res_auth.text
+

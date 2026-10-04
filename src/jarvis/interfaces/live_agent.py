@@ -18,6 +18,8 @@ from livekit.agents.types import APIConnectOptions
 from livekit.agents.voice_assistant import VoiceAssistant
 from livekit.plugins import openai, silero
 
+from jarvis.core.config import OLLAMA_LOCAL_URL
+
 logger = logging.getLogger("jarvis-live")
 
 

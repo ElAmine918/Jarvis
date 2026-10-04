@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from jarvis.tools.self_improve import SelfImproveTool
 
@@ -50,4 +51,18 @@ class DummyNewTool(Tool):
     finally:
         if os.path.exists(dest_file):
             os.remove(dest_file)
+
+
+@pytest.mark.asyncio
+async def test_self_improve_write_error(self_improve):
+    valid_code = "class ValidTool:\n    pass"
+    with patch("pathlib.Path.write_text", side_effect=IOError("Permission denied")):
+        res = await self_improve.execute(tool_name="tool_fail", code=valid_code)
+        assert "❌ Erreur lors de l'écriture" in res
+
+
+def test_self_improve_properties(self_improve):
+    assert self_improve.name == "self_improve_pipeline"
+    assert "Tool" in self_improve.description
+    assert "tool_name" in self_improve.parameters["properties"]
 

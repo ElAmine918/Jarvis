@@ -111,7 +111,7 @@ class SkillRegistry:
 
         for root, dirs, files in os.walk(directory):
             for file in files:
-                if file.endswith(".md"):
+                if file.endswith(".md") and not file.startswith("."):
                     filepath = os.path.join(root, file)
                     try:
                         skill = MarkdownSkill(filepath)
