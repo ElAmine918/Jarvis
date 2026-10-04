@@ -51,7 +51,7 @@ services:
     - jarvis-workspace:/app/workspace
     - ./src/jarvis:/app/jarvis:ro
     - ./src/jarvis/tools:/app/jarvis/tools:rw
-    - ./data/ssh:/root/.ssh:ro
+    - ./data/ssh:/app/.ssh:ro
     - ./:/repo:rw
     networks:
     - jarvis-net
