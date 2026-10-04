@@ -396,18 +396,41 @@ async def get_all_backends(history: list = None) -> list:
     # Les modèles "faibles" (Ollama) seront en dernier recours.
     qualified_pool = available_pool
 
-    # Tri du pool
+
+    # Tri du pool (Restructuration Efficace & Rapide)
     def sort_key(b):
-        # 1. Tier (Gemini > OR > Mac > Ollama)
-        # 2. Si Trivial -> Favoriser Speed ("fast" > "medium" > "slow")
-        # 3. Si Complexe -> Favoriser Score
         speed_val = {"fast": 0, "medium": 1, "slow": 2}.get(b["speed"], 1)
+        score = b["score"]
+        is_local = "Ollama" in b["name"] or "LM Studio" in b["name"]
+
         if complexity["level"] == "TRIVIAL":
-            return (b["tier"], speed_val, -b["score"])
+            # Pour des requêtes basiques : On veut du RAPIDE avant tout.
+            # 1. Vitesse (fast en premier)
+            # 2. Modèles Locaux (gratuit, privé, pas de limite de rate) vs Cloud
+            # 3. Score (on s'en fiche un peu, mais au cas où)
+            local_penalty = 0 if is_local else 1 # Priorise le local pour économiser les quotas Cloud sur du trivial
+            
+            # Groq est extrêmement rapide et gratuit, on le met au même niveau que le local pour les tâches basiques
+            if "Groq" in b["name"]:
+                local_penalty = 0
+                
+            return (speed_val, local_penalty, -score)
+
         elif complexity["level"] == "COMPLEXE":
-            return (b["tier"], -b["score"], speed_val)
+            # Pour le code/réflexion : On veut de l'INTELLIGENCE.
+            # 1. Le modèle a-t-il le score minimum requis ? (booléen inversé pour trier)
+            meets_threshold = 0 if score >= req_score else 1
+            # 2. Score brut (plus grand = mieux)
+            # 3. Vitesse (Groq 70B battra Gemini Pro sur la vitesse à score égal)
+            # 4. Pénalité pour les petits modèles locaux qui risquent de rater
+            local_penalty = 1 if (is_local and score < 85) else 0
+            
+            return (meets_threshold, -score, speed_val, local_penalty)
+
         else:
-            return (b["tier"], -b["score"], speed_val)
+            # SIMPLE / Normal
+            # Equilibre : Score d'abord, vitesse ensuite
+            return (-score, speed_val)
 
     qualified_pool.sort(key=sort_key)
 
