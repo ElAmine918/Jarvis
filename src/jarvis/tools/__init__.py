@@ -5,6 +5,7 @@ from .browser_tool import BrowserNavigateTool
 from .docker_tool import DockerTool
 from .filesystem import FileSystemTool
 from .git_tool import GitTool
+from .knowledge_tool import KnowledgeBaseTool
 from .memory_recall import MemoryRecallTool
 from .multi_agent import AdvisorTool, FusionTool, SubagentTool
 from .proxmox_tool import ProxmoxActionTool, ProxmoxStatusTool
@@ -40,4 +41,5 @@ def get_default_registry() -> ToolRegistry:
     registry.register(ProxmoxStatusTool())
     registry.register(ProxmoxActionTool())
     registry.register(SelfImproveTool())
+    registry.register(KnowledgeBaseTool())
     return registry

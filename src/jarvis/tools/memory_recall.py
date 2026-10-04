@@ -132,7 +132,7 @@ class MemoryRecallTool(Tool):
                             result_text += f"- Aucun résultat trouvé pour '{keyword}' dans la mémoire sémantique."
                         for r in results:
                             c = str(r['content'])[:150] + "..." if len(str(r['content'])) > 150 else str(r['content'])
-                        result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+                            result_text += f"\n- [{r['message_ts']}] {r['role'].capitalize()}: {c}"
 
                     finally:
                         await pool.close()
