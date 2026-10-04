@@ -36,6 +36,11 @@ Autonomie et Contrôle du Système :
 
 def get_system_prompt() -> str:
     # Look for prompt in data/system_prompt.txt
+    repo_prompt_path = Path("/repo/data/system_prompt.txt")
+    if repo_prompt_path.exists():
+        with open(repo_prompt_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+            
     prompt_path = (
         Path(os.getenv("WORKSPACE_DIR", "/app/workspace")).parent
         / "data"
@@ -62,7 +67,12 @@ class JarvisAgent:
         # Load from default locations if they exist
         import os
         from pathlib import Path
-        data_dir = Path(os.getenv("WORKSPACE_DIR", "/app/workspace")).parent / "data"
+        
+        # Le repo entier est monté dans /repo, on privilégie ce chemin pour lire les fichiers statiques à jour
+        if os.path.exists("/repo/data"):
+            data_dir = Path("/repo/data")
+        else:
+            data_dir = Path(os.getenv("WORKSPACE_DIR", "/app/workspace")).parent / "data"
         
         self.skill_registry.load_from_directory(str(data_dir / "skills"))
         self.rule_registry.load_from_directory(str(data_dir / "rules"))
