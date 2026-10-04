@@ -88,7 +88,7 @@ def log_conversation(
         "INSERT INTO conversations (id, session_id, source, user_id, message_in, message_out, model_used) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (conv_id, session_id, source, user_id, message_in, message_out, model_used),
     )
-conn.commit()
+    conn.commit()
     conn.close()
     
     # Try async vector ingestion if running in an async context

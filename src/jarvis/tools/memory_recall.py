@@ -132,8 +132,8 @@ class MemoryRecallTool(Tool):
                             result_text += f"- Aucun résultat trouvé pour '{keyword}' dans la mémoire sémantique."
                         for r in results:
                             c = str(r['content'])[:150] + "..." if len(str(r['content'])) > 150 else str(r['content'])
-                            result_text += f"
-- [Score: {r['score']:.2f} | Conv: {r['conversation_id'][:8]}] {c}"
+                        result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+
                     finally:
                         await pool.close()
                 except ImportError:
@@ -149,8 +149,8 @@ class MemoryRecallTool(Tool):
                     for row in rows:
                         msg_in = str(row[1])[:100] + "..." if len(str(row[1])) > 100 else str(row[1])
                         msg_out = str(row[2])[:100] + "..." if len(str(row[2])) > 100 else str(row[2])
-                        result_text += f"
-- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+                        result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+
                 except Exception as e:
                     return f"Erreur avec la recherche vectorielle : {e}"
 
