@@ -68,6 +68,31 @@ Jarvis a été conçu pour être à la fois un **assistant personnel du quotidie
 
 ---
 
+## 🧩 Architecture Modulaire et Cerveau Fonctionnel
+
+La refonte architecturale sépare rigoureusement la mécanique d'exécution (Mains) de la logique métier et des contraintes (Cerveau), inspirée par les standards de l'industrie (comme Hermes et ECC).
+
+### 1. Tools (Les Mains : Mécanique & Exécution)
+Fonctions Python déterministes hébergeant la logique d'interaction avec le système.
+- **Exemples :** `docker_tool.py`, `git_tool.py`, `filesystem.py`, `self_improve.py`.
+- **Rôle :** Exécuter du code, faire des requêtes réseau, manipuler des fichiers.
+
+### 2. Skills (Le Cerveau : Workflows & Méthodologie)
+Fichiers Markdown contenant des prompts d'instructions experts (`data/skills/*.md`). Chargés dynamiquement dans le contexte du LLM via déclencheurs (*triggers*).
+- **Importations majeures :**
+  - **DevOps & Infra :** `docker_compose_setup`, `ci_cd_pipeline`, `homelab_network_setup`.
+  - **Inspection & Audit :** `sdlc_review`, `codebase_inspection`, `advanced_code_review`.
+  - **Utilitaires :** `email_inbox_triage`, `architecture_diagram`, `prompt_optimizer`.
+
+### 3. Rules (Les Garde-fous : Directives Universelles)
+Fichiers Markdown imposant des contraintes de contexte actives en continu ou sous condition (`data/rules/*.md`).
+- **Exemple :** Règle de tutoiement et de politesse (`language.md`), standards de code.
+
+### 4. Triggers (Les Réflexes : Événements Proactifs)
+Système asynchrone (Crons, Webhooks) capable de réveiller l'agent en arrière-plan sans intervention humaine.
+
+---
+
 ## 🧠 Cœur Agentique & Résilience Multi-LLM
 
 Le composant [`router.py`](file:///Users/amine/Code/Jarvis/src/jarvis/core/router.py) classe et ordonne dynamiquement les moteurs disponibles selon la complexité du prompt et la disponibilité des endpoints :

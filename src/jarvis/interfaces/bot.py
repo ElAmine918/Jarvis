@@ -193,15 +193,33 @@ async def cmd_skills(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _check_allowed(update):
         return
     agent: JarvisAgent = context.bot_data["agent"]
-    skills = await agent.memory.search_skills("")
-    if not skills:
+    
+    # 1. Charger les compétences (workflows Markdown)
+    loaded_skills = agent.skill_registry.get_all_skills()
+    
+    # 2. Charger les faits appris dynamiquement (DB SQLite)
+    learned_skills = await agent.memory.search_skills("")
+    
+    lines = []
+    
+    if loaded_skills:
+        lines.append("🛠️ *Workflows et Méthodologies (Système)* :")
+        for s in loaded_skills:
+            desc = s.description if s.description else "Aucune description."
+            lines.append(f"• *{s.name}* : {desc}")
+        lines.append("")
+        
+    if learned_skills:
+        lines.append("🧠 *Connaissances et Faits appris dynamiquement* :")
+        for s in learned_skills:
+            lines.append(
+                f"• *{s['name']}* — {s['description']} (utilisé {s['use_count']} fois)"
+            )
+            
+    if not loaded_skills and not learned_skills:
         await update.message.reply_text("Aucune compétence sauvegardée pour l'instant.")
         return
-    lines = ["📚 *Compétences apprises :*\n"]
-    for s in skills:
-        lines.append(
-            f"• *{s['name']}* — {s['description']} (utilisé {s['use_count']} fois)"
-        )
+        
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
