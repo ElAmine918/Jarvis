@@ -45,6 +45,23 @@ def get_system_prompt() -> str:
 class JarvisAgent:
     def __init__(self):
         self.tool_registry = get_default_registry()
+        
+        from jarvis.skills.base import SkillRegistry
+        from jarvis.rules.base import RuleRegistry
+        from jarvis.triggers.base import TriggerManager
+        
+        self.skill_registry = SkillRegistry()
+        self.rule_registry = RuleRegistry()
+        self.trigger_manager = TriggerManager()
+        
+        # Load from default locations if they exist
+        import os
+        from pathlib import Path
+        data_dir = Path(os.getenv("WORKSPACE_DIR", "/app/workspace")).parent / "data"
+        
+        self.skill_registry.load_from_directory(str(data_dir / "skills"))
+        self.rule_registry.load_from_directory(str(data_dir / "rules"))
+        
         self.memory = MemoryManager()
         self.last_backend_used = "En attente"
 
@@ -84,6 +101,8 @@ class JarvisAgent:
         self, open_webui_messages: list[dict[str, Any]], session_id: str
     ) -> list[dict[str, Any]]:
         filtered_msgs = []
+        user_context_text = ""
+        
         for m in open_webui_messages:
             if m["role"] == "system":
                 continue
@@ -105,6 +124,8 @@ class JarvisAgent:
                     continue
                 # For images, we just pass the content as-is so Gemini/OpenRouter can process the base64 or URL
                 filtered_msgs.append({"role": m["role"], "content": content})
+                if m["role"] == "user":
+                    user_context_text += " " + full_text
             else:
                 if (
                     "Generate a concise title" in content
@@ -114,8 +135,25 @@ class JarvisAgent:
                     continue
                 clean_content = content.split("\n\n— ")[0]
                 filtered_msgs.append({"role": m["role"], "content": clean_content})
+                if m["role"] == "user":
+                    user_context_text += " " + clean_content
 
-                dynamic_system_prompt = get_system_prompt()
+        dynamic_system_prompt = get_system_prompt()
+        
+        # Inject Active Rules
+        active_rules = self.rule_registry.get_active_rules(user_context_text)
+        if active_rules:
+            dynamic_system_prompt += "\n\n[RÈGLES ACTIVES :]\n"
+            for rule in active_rules:
+                dynamic_system_prompt += f"- {rule.name}: {rule.content}\n"
+                
+        # Inject Applicable Skills
+        applicable_skills = self.skill_registry.find_applicable_skills(user_context_text)
+        if applicable_skills:
+            dynamic_system_prompt += "\n\n[COMPÉTENCES/WORKFLOWS PERTINENTS (SKILLS) :]\n"
+            for skill in applicable_skills:
+                dynamic_system_prompt += f"--- DEBUT SKILL: {skill.name} ---\n{skill.instructions}\n--- FIN SKILL: {skill.name} ---\n\n"
+
         if session_id != "open-webui":
             dynamic_system_prompt += "\n\n[INTERFACE: TELEGRAM]\nVous parlez actuellement à Monsieur via Telegram. N'UTILISEZ AUCUN FORMATAGE MARKDOWN (pas d'astérisques, pas de gras, pas de listes complexes), uniquement du texte brut clair et bien espacé. Soyez détaillé et communicant tout en restant élégant."
         else:
