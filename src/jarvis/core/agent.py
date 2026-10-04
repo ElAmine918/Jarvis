@@ -225,8 +225,9 @@ class JarvisAgent:
                 return
 
             assistant_msg = {"role": "assistant"}
-            if final_text:
-                assistant_msg["content"] = final_text
+            # Fix Google Gemini 400 Bad Request (missing thought_signature)
+            # and Ollama strict parsing by ALWAYS providing content.
+            assistant_msg["content"] = final_text if final_text else "Exécution de l'outil en cours..."
 
             tool_calls_list = []
             if tool_calls_dict:
