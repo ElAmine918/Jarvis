@@ -38,13 +38,15 @@ build/
 .venv/
 venv/
 env/
+.coverage
+.coverage.*
 
-# --- Docker ---
-# Ne pas commit les volumes Docker montés localement
-data/
+# --- Docker & Runtime Volumes ---
 workspace/
-
-# --- Jarvis memory & runtime ---
+data/*.db
+data/*.db-journal
+data/ssh/
+data/workspace/
 jarvis/data/
 *.db
 *.db-journal
@@ -58,12 +60,4 @@ logs/
 *.tar.gz
 tmp/
 scratch/
-# Exclude only debug/scratch test scripts at the root level (not tests/ folder)
-fix_*.py
-generate_tests.py
 
-# --- Docker volumes & runtime data (exclude sensitive runtime files, not static config) ---
-data/*.db
-data/ssh/
-data/workspace/
-workspace/

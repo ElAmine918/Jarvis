@@ -16,3 +16,4 @@ livekit-plugins-openai
 livekit-plugins-silero
 asyncpg~=0.30
 pgvector~=0.3
+pyyaml

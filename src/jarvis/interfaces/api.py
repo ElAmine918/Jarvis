@@ -133,7 +133,7 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
                 chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
 
                 async for chunk_text in agent.process_message(
-                    messages_dicts, body.model
+                    messages_dicts, session_id="open-webui", requested_model=body.model
                 ):
                     full_response += chunk_text
                     chunk = {
@@ -198,7 +198,9 @@ async def chat_completions(request: Request, body: ChatCompletionRequest):
 
     try:
         response_text = ""
-        async for chunk_text in agent.process_message(messages_dicts, body.model):
+        async for chunk_text in agent.process_message(
+            messages_dicts, session_id="open-webui", requested_model=body.model
+        ):
             response_text += chunk_text
 
         from jarvis.storage.logger_db import log_conversation

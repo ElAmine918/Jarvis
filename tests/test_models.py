@@ -40,8 +40,13 @@ async def test_get_dynamic_gemini_models_api_error():
 def test_no_hardcoded_api_keys():
     """Security test: ensure no API key is hardcoded in the test file itself."""
     import inspect
+    import re
     import tests.test_models as this_module
-    source = inspect.getsource(this_module)
-    # Must not contain actual API key patterns
-    assert "AQ." not in source, "Hardcoded API key found!"
-    assert "sk-" not in source, "Hardcoded OpenAI key found!"
+    lines = inspect.getsourcelines(this_module)[0]
+    # Filter out this check function lines to avoid matching literal check strings
+    test_lines = [l for l in lines if "def test_no_hardcoded_api_keys" not in l and "source" not in l]
+    source_to_check = "".join(test_lines)
+    # Check for Gemini or OpenAI API key patterns
+    assert not re.search(r"AQ\.[a-zA-Z0-9_-]{20,}", source_to_check), "Hardcoded Gemini API key found!"
+    assert not re.search(r"sk-[a-zA-Z0-9_-]{20,}", source_to_check), "Hardcoded OpenAI API key found!"
+

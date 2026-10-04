@@ -32,7 +32,7 @@ class MemoryManager:
                 )
             """)
             await db.execute("""
-                CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts USING fts5(name, description, content, content_rowid='id');
+                CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts USING fts5(name, description, content, content='skills', content_rowid='id');
             """)
             await db.execute("""
                 CREATE TRIGGER IF NOT EXISTS skills_ai AFTER INSERT ON skills BEGIN
@@ -98,7 +98,9 @@ class MemoryManager:
                             (name,),
                         )
                         await db.commit()
-                        return dict(row)
+                        res = dict(row)
+                        res["use_count"] = (res.get("use_count") or 0) + 1
+                        return res
             return None
         except Exception as e:
             logger.error(f"Erreur get_skill: {e}")

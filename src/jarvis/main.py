@@ -74,7 +74,7 @@ async def main():
     logger.info("✅ Agent initialisé (mémoire SQLite prête)")
 
     # Recharger les rappels planifiés survivant au redémarrage
-    from .tools.scheduler_tool import SchedulerTool
+    from jarvis.tools.scheduler_tool import SchedulerTool
 
     await SchedulerTool.reload_pending_jobs()
     logger.info("✅ Rappels planifiés rechargés")

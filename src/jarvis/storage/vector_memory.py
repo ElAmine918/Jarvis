@@ -115,7 +115,9 @@ async def search_memory(pool, query: str, limit: int = 5) -> list[dict]:
                 "message_id": r["message_id"],
                 "content": r["content"],
                 "timestamp": r["message_ts"],
+                "message_ts": r["message_ts"],
                 "conversation_id": r["conversation_id"],
-                "score": r["score"]
+                "score": r["score"],
+                "role": "Assistant",
             })
         return results

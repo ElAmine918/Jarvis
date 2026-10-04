@@ -11,6 +11,7 @@ triggers:
 - "revue de code avanc\xE9e"
 - code review
 - analyse approfondie du code
+- r\xE9vise ce code
 ---
 
 

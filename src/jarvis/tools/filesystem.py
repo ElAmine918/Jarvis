@@ -19,7 +19,8 @@ ALLOWED_ROOTS = [
 ]
 
 def _safe_path(raw: str) -> Path | None:
-    if not raw: return None
+    if not raw or "\0" in raw:
+        return None
     # Anti-traversal sec check
     if ".." in raw:
         return None
@@ -101,7 +102,8 @@ class FileSystemTool(Tool):
             if not safe.exists():
                 return f"❌ Le fichier ou dossier n'existe pas : {safe}"
             st = safe.stat()
-            return f"Chemin: {safe}\nTaille: {st.st_size}\nType: {'Dir' if safe.is_dir() else 'File'}"
+            file_type = "Dossier (Dir)" if safe.is_dir() else "Fichier (File)"
+            return f"Chemin: {safe}\nTaille: {st.st_size}\nType: {file_type}"
         elif action in ("move", "rename"):
             safe_dest = _safe_path(dest_path)
             if not safe_dest: return "🚫 Destination interdite."

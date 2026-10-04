@@ -14,6 +14,14 @@ def _get_api_headers():
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+def _get_api_url():
+    port = os.getenv("API_PORT", "8080")
+    host = os.getenv("API_HOST", "127.0.0.1")
+    if host == "0.0.0.0":
+        host = "127.0.0.1"
+    return f"http://{host}:{port}/v1/chat/completions"
+
+
 class SubagentTool(Tool):
     @property
     def name(self) -> str:
@@ -61,7 +69,7 @@ class SubagentTool(Tool):
                     "stream": False,
                 }
                 resp = await client.post(
-                    "http://127.0.0.1:8080/v1/chat/completions",
+                    _get_api_url(),
                     json=payload,
                     headers=_get_api_headers(),
                 )
@@ -118,7 +126,7 @@ class AdvisorTool(Tool):
                     "stream": False,
                 }
                 resp = await client.post(
-                    "http://127.0.0.1:8080/v1/chat/completions",
+                    _get_api_url(),
                     json=payload,
                     headers=_get_api_headers(),
                 )
@@ -170,7 +178,7 @@ class FusionTool(Tool):
                         "stream": False,
                     }
                     resp = await client.post(
-                        "http://127.0.0.1:8080/v1/chat/completions",
+                        _get_api_url(),
                         json=payload,
                         headers=_get_api_headers(),
                     )
@@ -198,7 +206,7 @@ class FusionTool(Tool):
                     "stream": False,
                 }
                 resp = await client.post(
-                    "http://127.0.0.1:8080/v1/chat/completions",
+                    _get_api_url(),
                     json=payload,
                     headers=_get_api_headers(),
                 )

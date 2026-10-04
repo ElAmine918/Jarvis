@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis"
+version = "6.0.0"
+description = "Autonomous AI Agent & Homelab Infrastructure Operator"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Amine" }
+]
+dependencies = [
+    "python-telegram-bot[job-queue]~=21.6",
+    "openai~=1.58",
+    "fastapi~=0.115",
+    "uvicorn[standard]~=0.32",
+    "httpx~=0.27",
+    "aiosqlite~=0.20",
+    "psutil~=6.1",
+    "rich",
+    "textual",
+    "edge-tts",
+    "proxmoxer",
+    "requests",
+    "mcp",
+    "livekit-agents",
+    "livekit-plugins-openai",
+    "livekit-plugins-silero",
+    "asyncpg~=0.30",
+    "pgvector~=0.3",
+    "pyyaml"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

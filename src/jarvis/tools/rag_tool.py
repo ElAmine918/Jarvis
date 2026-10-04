@@ -60,13 +60,18 @@ class DocumentRAGTool(Tool):
             api_port = os.getenv("API_PORT", "8080")
             url = f"http://{api_host}:{api_port}/v1/chat/completions"
 
+            headers = {}
+            api_key = os.getenv("JARVIS_API_KEY", "").strip()
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
             async with httpx.AsyncClient(timeout=120.0) as client:
                 payload = {
                     "model": "jarvis-auto",
                     "messages": [{"role": "user", "content": prompt}],
                     "stream": False,
                 }
-                resp = await client.post(url, json=payload)
+                resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
                 return (

@@ -74,6 +74,12 @@ def init_db():
     conn.close()
 
 
+try:
+    init_db()
+except Exception:
+    pass
+
+
 def log_conversation(
     session_id: str,
     source: str,

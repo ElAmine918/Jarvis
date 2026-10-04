@@ -323,7 +323,7 @@ async def entrypoint(ctx: JobContext):
             description="Requête de recherche, ex: 'Météo Paris', 'News Tech'"
         ),
     ):
-        from .tools.browser_tool import BrowserNavigateTool
+        from jarvis.tools.browser_tool import BrowserNavigateTool
 
         tool = BrowserNavigateTool()
         res = await tool.execute(url_or_search=url_or_search)
@@ -333,7 +333,7 @@ async def entrypoint(ctx: JobContext):
         description="Obtenir l'état du serveur Proxmox et des conteneurs Docker."
     )
     async def proxmox_status():
-        from .tools.proxmox_tool import ProxmoxStatusTool
+        from jarvis.tools.proxmox_tool import ProxmoxStatusTool
 
         tool = ProxmoxStatusTool()
         return await tool.execute()

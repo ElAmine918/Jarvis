@@ -1,5 +1,9 @@
 import asyncio
 import logging
+import os
+import sys
+import tempfile
+import uuid
 from typing import Any
 
 from jarvis.tools.base import Tool
@@ -42,23 +46,23 @@ class PythonREPLTool(Tool):
         if len(code.encode("utf-8")) > _MAX_CODE_SIZE:
             return f"❌ Le code dépasse la limite autorisée de {_MAX_CODE_SIZE // 1024} KB."
 
+        work_dir = "/app" if os.path.isdir("/app") else tempfile.gettempdir()
         script_name = f"script_{uuid.uuid4().hex[:8]}.py"
-        script_path = os.path.join("/app", script_name)
+        script_path = os.path.join(work_dir, script_name)
 
         try:
-            with open(script_path, "w") as f:
+            with open(script_path, "w", encoding="utf-8") as f:
                 f.write(code)
 
-            # L'agent a désormais besoin de modifier son propre code et d'avoir accès
-            # à son environnement pour s'améliorer (auto-codage).
-            # L'isolation bwrap est retirée pour permettre l'autonomie.
-            cmd = ["python3", script_path]
+            # Utilise l'interpréteur Python actuel pour compatibilité local / docker / venv
+            python_bin = sys.executable if sys.executable else "python3"
+            cmd = [python_bin, script_path]
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd="/app",
+                cwd=work_dir,
             )
 
             try:

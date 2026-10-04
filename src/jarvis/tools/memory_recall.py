@@ -121,8 +121,10 @@ class MemoryRecallTool(Tool):
                             result_text += f"- Aucun résultat trouvé pour '{keyword}' dans la mémoire sémantique."
                         else:
                             for r in results:
-                                c = str(r['content'])[:150] + "..." if len(str(r['content'])) > 150 else str(r['content'])
-                                result_text += f"\n- [{r['message_ts']}] {r['role'].capitalize()}: {c}"
+                                c = str(r.get('content', ''))[:150] + "..." if len(str(r.get('content', ''))) > 150 else str(r.get('content', ''))
+                                ts = r.get('timestamp') or r.get('message_ts', '')
+                                role = (r.get('role') or 'Assistant').capitalize()
+                                result_text += f"\n- [{ts}] {role}: {c}"
                     finally:
                         await pool.close()
                 except (ImportError, Exception) as vec_err:

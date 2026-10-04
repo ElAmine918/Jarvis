@@ -2,6 +2,7 @@ from .admin_tool import AdminActionTool
 from .apply_patch import ApplyPatchTool
 from .base import Tool, ToolRegistry
 from .browser_tool import BrowserNavigateTool
+from .deep_research import DeepResearchTool
 from .docker_tool import DockerTool
 from .filesystem import FileSystemTool
 from .git_tool import GitTool
@@ -42,4 +43,5 @@ def get_default_registry() -> ToolRegistry:
     registry.register(ProxmoxActionTool())
     registry.register(SelfImproveTool())
     registry.register(KnowledgeBaseTool())
+    registry.register(DeepResearchTool())
     return registry

@@ -45,12 +45,22 @@ class ShellTool(Tool):
             return "❌ Commande shell vide."
 
         # Security check: log warning and block extremely dangerous patterns
-        logger.warning(f"SECURITY WARNING: Exécution shell non sandboxée demandée : {command!r}")
-        dangerous_patterns = [r"\brm\s+-rf\s+/", r"\bmv\s+.* /dev/null"]
+        logger.warning(f"SECURITY WARNING: Exécution shell demandée : {command!r}")
+        dangerous_patterns = [
+            r"\brm\s+-rf\s+[/~]",
+            r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+/",
+            r"\bmv\s+.* /dev/null",
+            r":\(\)\s*\{\s*:\|:&\s*\};:",
+            r"\bmkfs(\.[a-z0-9]+)?\b",
+            r"\bdd\s+.*of=/dev/(sd|nvme|hd|vd|null)",
+            r">\s*/dev/(sd|nvme|hd|vd)[a-z0-9]*",
+            r"\b(shutdown|reboot|poweroff|init\s+0|halt)\b",
+            r"\bchmod\s+-R\s+777\s+/",
+        ]
         for p in dangerous_patterns:
             if re.search(p, command):
                 logger.error(f"SECURITY BLOCK: Commande dangereuse interceptée : {command}")
-                return f"🚫 Sécurité : Commande interceptée car potentiellement destructrice."
+                return "🚫 Sécurité : Commande interceptée car potentiellement destructrice ou non autorisée en shell direct."
 
         working_dir = cwd or "/app"
         if not os.path.isdir(working_dir):

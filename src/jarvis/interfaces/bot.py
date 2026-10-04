@@ -261,7 +261,7 @@ async def cmd_ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             results.append(f"🔴 *{name}* : Erreur ({e})")
 
-    final_text = "📊 *DIAGNOSTIC RÉSEAU*\\n━━━━━━━━━━━━━━━━━━━━━\\n\\n" + "\\n".join(
+    final_text = "📊 *DIAGNOSTIC RÉSEAU*\n━━━━━━━━━━━━━━━━━━━━━\n\n" + "\n".join(
         results
     )
     await msg.edit_text(final_text, parse_mode=ParseMode.MARKDOWN)
@@ -618,32 +618,32 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
 
     # Get the highest resolution photo
-    photo_file = await update.message.photo[-1].get_file()
-    import io
-    import base64
-    out = io.BytesIO()
-    await photo_file.download_to_memory(out)
-    b64 = base64.b64encode(out.getvalue()).decode("utf-8")
-
-    agent: JarvisAgent = context.bot_data["agent"]
-
-    if "history" not in context.user_data:
-        context.user_data["history"] = []
-
-    history = context.user_data["history"]
-    
-    # Format multimodale OpenAI
-    message_content = [
-        {"type": "text", "text": caption},
-        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-    ]
-    
-    history.append({"role": "user", "content": message_content})
-
-    if len(history) > 10:
-        history = history[-10:]
-
     try:
+        photo_file = await update.message.photo[-1].get_file()
+        import io
+        import base64
+        out = io.BytesIO()
+        await photo_file.download_to_memory(out)
+        b64 = base64.b64encode(out.getvalue()).decode("utf-8")
+
+        agent: JarvisAgent = context.bot_data["agent"]
+
+        if "history" not in context.user_data:
+            context.user_data["history"] = []
+
+        history = context.user_data["history"]
+        
+        # Format multimodale OpenAI
+        message_content = [
+            {"type": "text", "text": caption},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+        ]
+        
+        history.append({"role": "user", "content": message_content})
+
+        if len(history) > 10:
+            history = history[-10:]
+
         response = ""
         async for chunk in agent.process_message(history, str(user_id)):
             response += chunk

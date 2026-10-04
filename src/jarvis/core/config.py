@@ -43,11 +43,25 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
-# --- Chemins des données (pour Docker) ---
-SKILLS_DIR = os.getenv("SKILLS_DIR", "/app/data/skills")
-MEMORY_DB_PATH = os.getenv("MEMORY_DB_PATH", "/app/data/memory.db")
-LOGS_DB_PATH = os.getenv("LOGS_DB_PATH", "/app/data/logs.db")
-WORKSPACE_DIR = os.getenv("WORKSPACE_DIR", "/app/workspace")
+# --- Chemins des données (Portable Docker / Local / CI) ---
+def _resolve_default_data_dir() -> str:
+    if os.path.exists("/app/data") or (os.path.exists("/app") and os.access("/app", os.W_OK)):
+        return "/app/data"
+    # Local fallback
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    local_data = os.path.join(project_root, "data")
+    if os.path.exists(local_data):
+        return local_data
+    return os.path.join(os.getcwd(), "data")
+
+_DEFAULT_DATA_DIR = _resolve_default_data_dir()
+SKILLS_DIR = os.getenv("SKILLS_DIR", os.path.join(_DEFAULT_DATA_DIR, "skills"))
+MEMORY_DB_PATH = os.getenv("MEMORY_DB_PATH", os.path.join(_DEFAULT_DATA_DIR, "memory.db"))
+LOGS_DB_PATH = os.getenv("LOGS_DB_PATH", os.path.join(_DEFAULT_DATA_DIR, "logs.db"))
+WORKSPACE_DIR = os.getenv(
+    "WORKSPACE_DIR",
+    "/app/workspace" if os.path.isdir("/app") else os.path.join(os.getcwd(), "workspace"),
+)
 
 # --- Serveur API interne (pour Open WebUI) ---
 API_HOST = os.getenv("API_HOST", "0.0.0.0")

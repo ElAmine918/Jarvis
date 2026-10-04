@@ -449,12 +449,19 @@ DASHBOARD_HTML = """
 """
 
 
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 
 
-def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+def verify_admin(credentials: HTTPBasicCredentials | None = Depends(security)):
     if not ADMIN_PASSWORD:
         return credentials  # Mode developpement
+
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
     correct_username = secrets.compare_digest(credentials.username, "admin")
     correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)

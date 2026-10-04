@@ -47,16 +47,64 @@ class HTMLToTextParser(HTMLParser):
 def _is_private_ip(ip_str: str) -> bool:
     try:
         ip = ipaddress.ip_address(ip_str)
-        return ip.is_private or ip.is_loopback or ip.is_link_local
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        )
     except ValueError:
         return False
 
 
+_BLOCKED_HOSTNAMES = {
+    "localhost",
+    "jarvis",
+    "jarvis-live",
+    "jarvis-pgvector",
+    "docker-proxy",
+    "chromium",
+    "open-webui",
+    "whisper",
+    "caddy",
+    "portainer",
+    "ollama",
+}
+
+
 def _is_safe_url(url: str) -> bool:
-    """Vérifie que l'URL a un schéma http ou https valide."""
+    """Vérifie que l'URL a un schéma http ou https valide et n'accède à aucune ressource locale/privée (SSRF)."""
+    if not url or not isinstance(url, str):
+        return False
     try:
         parsed = urlparse(url)
-        return parsed.scheme in ("http", "https") and bool(parsed.hostname)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = (parsed.hostname or "").lower().strip("[]")
+        if not hostname:
+            return False
+
+        if hostname in _BLOCKED_HOSTNAMES or hostname.endswith(".local") or hostname.endswith(".internal"):
+            return False
+
+        # Vérification si c'est directement une adresse IP (IPv4 ou IPv6)
+        if _is_private_ip(hostname):
+            return False
+
+        # Résolution DNS pour éviter DNS Rebinding vers une IP privée
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for item in addr_info:
+                ip_addr = item[4][0]
+                if _is_private_ip(ip_addr):
+                    return False
+        except (socket.gaierror, Exception):
+            # Si le domaine ne peut pas être résolu, on rejette par sécurité
+            return False
+
+        return True
     except Exception:
         return False
 
@@ -87,13 +135,22 @@ class WebReaderTool(Tool):
         }
 
     async def execute(self, url: str, **kwargs) -> str:
-        if not _is_safe_url(url):
-            logger.warning(f"Tentative SSRF bloquée vers {url}")
-            return "🚫 URL bloquée. Les adresses IP locales, privées, et Tailscale sont interdites."
-
+        current_url = url
+        max_redirects = 5
         try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-                response = await client.get(url)
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
+                for _ in range(max_redirects):
+                    if not _is_safe_url(current_url):
+                        logger.warning(f"Tentative SSRF bloquée vers {current_url}")
+                        return "🚫 URL bloquée. Les adresses IP locales, privées, et Tailscale sont interdites."
+                    response = await client.get(current_url)
+                    if getattr(response, "is_redirect", False) is True:
+                        location = response.headers.get("location")
+                        if not location or not isinstance(location, str):
+                            break
+                        current_url = str(httpx.URL(current_url).join(location))
+                    else:
+                        break
                 response.raise_for_status()
 
             parser = HTMLToTextParser()
