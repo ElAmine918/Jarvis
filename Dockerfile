@@ -23,6 +23,7 @@ WORKDIR /app
 # on utilise gpg --batch --no-tty pour éviter cette contrainte.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
+    openssh-client \
     git \
     bubblewrap \
     iproute2 \
