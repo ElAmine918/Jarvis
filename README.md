@@ -1,4 +1,4 @@
-# 🤖 Jarvis — Assistant IA Agentique
+# Jarvis — Assistant IA Agentique
 
 > Un assistant IA auto-hébergé et hautement autonome fonctionnant sur Docker. Jarvis est un agent IA multi-backends avec une bascule automatique (failover cascade), une mémoire avancée (PostgreSQL + pgvector), et de pleines capacités DevOps (Docker, Git, Shell).
 
