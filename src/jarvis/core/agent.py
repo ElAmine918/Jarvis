@@ -143,7 +143,8 @@ class JarvisAgent:
             return
 
         tools = self._build_tools_openai_format()
-        max_iterations = 15
+        max_iterations = 30
+        last_char = "\n"
 
         for iteration in range(max_iterations):
             current_backend = ""
@@ -191,6 +192,8 @@ class JarvisAgent:
                         if delta.content:
                             final_text += delta.content
                             yield delta.content
+                            if delta.content:
+                                last_char = delta.content[-1]
 
                         if delta.tool_calls:
                             for tc_chunk in delta.tool_calls:
@@ -269,7 +272,9 @@ class JarvisAgent:
                     except json.JSONDecodeError:
                         tool_args = {}
 
-                    yield f"\n⚙️ *Exécution de {tool_name}...*"
+                    prefix = "\n" if last_char != "\n" else ""
+                    yield f"{prefix}⚙️ *Exécution de {tool_name}...*\n"
+                    last_char = "\n"
 
                     from jarvis.storage.logger_db import log_action
 
