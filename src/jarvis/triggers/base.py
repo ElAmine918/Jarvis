@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from abc import ABC, abstractmethod
 from typing import Callable, Any, Optional, Dict
 
@@ -34,7 +35,7 @@ class Trigger(ABC):
     async def fire(self, payload: Dict[str, Any]):
         """Fire the trigger, calling the attached callback."""
         if self._callback:
-            if asyncio.iscoroutinefunction(self._callback):
+            if inspect.iscoroutinefunction(self._callback):
                 await self._callback(self.name, payload)
             else:
                 self._callback(self.name, payload)

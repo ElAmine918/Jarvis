@@ -98,6 +98,8 @@ class FileSystemTool(Tool):
             safe.mkdir(parents=True, exist_ok=True)
             return f"✅ Créé : {safe}"
         elif action == "stat":
+            if not safe.exists():
+                return f"❌ Le fichier ou dossier n'existe pas : {safe}"
             st = safe.stat()
             return f"Chemin: {safe}\nTaille: {st.st_size}\nType: {'Dir' if safe.is_dir() else 'File'}"
         elif action in ("move", "rename"):
