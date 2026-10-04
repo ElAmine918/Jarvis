@@ -5,7 +5,7 @@ from datetime import datetime
 import httpx
 import asyncpg
 from pgvector.asyncpg import register_vector
-from jarvis.core.config import GEMINI_API_KEY, LM_STUDIO_URL
+from jarvis.core.config import GEMINI_API_KEY, LM_STUDIO_URL, OLLAMA_LOCAL_URL
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,19 @@ async def generate_embedding(text: str) -> list[float]:
         except Exception as e:
             logger.warning(f"Erreur Gemini Embedding: {e}. Fallback LM Studio...")
 
+    if OLLAMA_LOCAL_URL:
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(
+                    f"{OLLAMA_LOCAL_URL}/embeddings",
+                    json={"model": "nomic-embed-text", "input": text},
+                    timeout=5.0
+                )
+                if res.status_code == 200:
+                    return res.json()["data"][0]["embedding"]
+        except Exception as e:
+            logger.warning(f"Erreur Ollama Embedding: {e}")
+
     if LM_STUDIO_URL:
         try:
             async with httpx.AsyncClient() as client:
@@ -51,7 +64,7 @@ async def generate_embedding(text: str) -> list[float]:
         except Exception as e:
             logger.error(f"Erreur LM Studio Embedding: {e}")
             
-    raise Exception("Impossible de générer l'embedding (ni Gemini ni LM Studio ne sont disponibles).")
+    raise Exception("Impossible de générer l'embedding (aucun fournisseur n'est disponible).")
 
 async def ingest_message(pool, source: str, conversation_id: str, message_id: str, role: str, content: str, seq: int):
     """
