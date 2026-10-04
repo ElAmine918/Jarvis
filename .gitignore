@@ -58,4 +58,12 @@ logs/
 *.tar.gz
 tmp/
 scratch/
-test_*.py
+# Exclude only debug/scratch test scripts at the root level (not tests/ folder)
+fix_*.py
+generate_tests.py
+
+# --- Docker volumes & runtime data (exclude sensitive runtime files, not static config) ---
+data/*.db
+data/ssh/
+data/workspace/
+workspace/

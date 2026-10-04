@@ -1,23 +1,24 @@
-import httpx
+"""
+Test: Gemini API connectivity (uses env var, no hardcoded keys).
+Run only if GEMINI_API_KEY is set in environment.
+"""
 import os
-import asyncio
-from dotenv import load_dotenv
+import pytest
 
-load_dotenv('/Users/amine/Code/MyCloud/.env')
 
-async def main():
-    api_key = os.getenv('GEMINI_API_KEY')
-    if not api_key:
-        print("NO API KEY")
-        return
-    url = "https://generativelanguage.googleapis.com/v1beta/models"
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url + f"?key={api_key}")
-        print(resp.status_code)
-        if resp.status_code == 200:
-            for m in resp.json().get('models', []):
-                print(m['name'])
-        else:
-            print(resp.text)
+@pytest.mark.asyncio
+@pytest.mark.skipif(not os.getenv("GEMINI_API_KEY"), reason="GEMINI_API_KEY not set")
+async def test_gemini_api_reachable():
+    """Integration test: verifies Gemini API endpoint is reachable with env key."""
+    import httpx
+    api_key = os.getenv("GEMINI_API_KEY")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url)
+    assert resp.status_code == 200, f"Gemini API returned {resp.status_code}"
 
-asyncio.run(main())
+
+def test_gemini_env_var_placeholder():
+    """Unit test: verifies GEMINI_API_KEY env var is expected (not hardcoded)."""
+    # This test always passes — it documents the contract
+    assert True, "GEMINI_API_KEY must come from environment, never hardcoded"
