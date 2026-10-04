@@ -58,7 +58,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # --- Ollama Survie (Local Toshiba) ---
 OLLAMA_LOCAL_URL = os.getenv("OLLAMA_LOCAL_URL", "http://ollama:11434/v1")
-OLLAMA_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "qwen2.5:7b")
+OLLAMA_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "llama3.2:3b")
 
 # --- Voice (STT/TTS) ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
