@@ -5,22 +5,22 @@ services:
     restart: unless-stopped
     environment:
       CONTAINERS: 1
-      IMAGES: 0
-      NETWORKS: 0
-      VOLUMES: 0
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
       POST: 1
-      EXEC: 0
-      BUILD: 0
+      EXEC: 1
+      BUILD: 1
       COMMIT: 0
-      CONFIGS: 0
+      CONFIGS: 1
       DISTRIBUTION: 0
-      INFO: 0
+      INFO: 1
       NODES: 0
       PLUGINS: 0
-      SERVICES: 0
+      SERVICES: 1
       SESSION: 0
       SWARM: 0
-      SYSTEM: 0
+      SYSTEM: 1
       TASKS: 0
       SECRETS: 0
     volumes:

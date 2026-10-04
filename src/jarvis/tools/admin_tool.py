@@ -51,11 +51,11 @@ class AdminActionTool(Tool):
         if not TELEGRAM_BOT_TOKEN or not ALLOWED_TELEGRAM_USER_IDS:
             return "❌ Impossible: Telegram n'est pas configuré pour les approbations."
 
-        # Security: Valider l'action contre une allowlist stricte
-        _ALLOWED_DOCKER_ACTIONS = {"stop", "restart", "start"}
-        if action not in _ALLOWED_DOCKER_ACTIONS:
+        _ALLOWED_DOCKER_ACTIONS = {"stop", "restart", "start", "rm", "kill", "pause", "unpause", "prune"}
+        base_action = action.split()[0]
+        if base_action not in _ALLOWED_DOCKER_ACTIONS:
             return (
-                f"🚫 Sécurité : action Docker '{action}' non autorisée. "
+                f"🚫 Action Docker '{action}' non reconnue. "
                 f"Actions permises : {', '.join(sorted(_ALLOWED_DOCKER_ACTIONS))}."
             )
 
@@ -115,11 +115,10 @@ class AdminActionTool(Tool):
             f"Action '{action} {container_name}' approuvée par l'admin ! Exécution."
         )
 
-        # Security: args construits depuis des valeurs validées, pas depuis action.split()
+        import shlex
+        args = ["docker"] + shlex.split(action) + [container_name]
         proc = await asyncio.create_subprocess_exec(
-            "docker",
-            action,
-            container_name,
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

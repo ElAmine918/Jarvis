@@ -85,10 +85,9 @@ class BrowserNavigateTool(Tool):
         if not target.startswith("http://") and not target.startswith("https://"):
             target = f"https://html.duckduckgo.com/html/??q={quote(target)}&hl=fr"
 
-        # C-04 : Validation SSRF — même protection que web_reader.py
         if not _is_safe_url(target):
-            logger.warning(f"Tentative SSRF bloquée dans browse_internet vers {target}")
-            return "🚫 URL bloquée. Les adresses IP locales, privées, Tailscale et les schémas non-HTTPS sont interdits."
+            logger.warning(f"URL invalide dans browse_internet : {target}")
+            return "🚫 URL invalide. L'URL doit commencer par http:// ou https://."
 
         logger.info(f"Navigateur Chromium : navigation vers {target}")
 

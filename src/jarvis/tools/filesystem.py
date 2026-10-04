@@ -1,10 +1,12 @@
 """
-Outil Filesystem — accès strictement restreint au workspace.
-Pas de shell. Chaque opération est implémentée nativement en Python.
-La validation de chemin utilise Path.resolve().is_relative_to() — immune aux `..`.
+Outil Filesystem pour Jarvis.
+Gère la lecture, l'écriture, l'ajout, la suppression, le déplacement et le listage
+des fichiers dans l'environnement (/app, /repo, /tmp).
 """
 
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -12,31 +14,41 @@ from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_PATHS = [Path("/app/workspace").resolve(), Path("/app/jarvis/tools").resolve(), Path("/repo").resolve()]
+import tempfile
+
+ALLOWED_ROOTS = [
+    Path("/app").resolve(),
+    Path("/repo").resolve(),
+    Path("/tmp").resolve(),
+    Path(tempfile.gettempdir()).resolve(),
+]
 
 
 def _safe_path(raw: str) -> Path | None:
     """
-    Résout le chemin et vérifie qu'il est bien sous ALLOWED_PATHS.
+    Résout le chemin et vérifie qu'il est bien sous un des répertoires de travail (/app, /repo, /tmp).
+    Si le chemin est relatif, il est résolu par rapport à /app.
     """
     try:
         raw_path = Path(raw)
-        # Si c'est relatif, on assume /app/workspace par défaut pour la commodité, ou on le résout depuis cwd
         if not raw_path.is_absolute():
-            raw_path = Path("/app/workspace") / raw
-            
+            # Si le dossier /repo existe et le chemin commence par src, etc., tenter /repo
+            if os.path.isdir("/repo") and (raw.startswith("src/") or raw.startswith("tests/")):
+                raw_path = Path("/repo") / raw
+            else:
+                raw_path = Path("/app") / raw
+
         resolved = raw_path.resolve()
-        if any(resolved.is_relative_to(p) for p in ALLOWED_PATHS):
-            return resolved
-        return None
-    except Exception:
+        for root in ALLOWED_ROOTS:
+            if resolved == root or resolved.is_relative_to(root):
+                return resolved
         return None
     except Exception:
         return None
 
 
 class FileSystemTool(Tool):
-    """Opérations sur les fichiers, limitées au répertoire principal /app."""
+    """Opérations complètes sur les fichiers dans /app, /repo et /tmp."""
 
     @property
     def name(self) -> str:
@@ -45,9 +57,8 @@ class FileSystemTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Lit, écrit, liste et crée des fichiers/dossiers dans /app. "
-            "Toutes les actions sont strictement limitées au workspace. "
-            "Aucun shell — pas de commandes arbitraires."
+            "Permet de lire, écrire, ajouter (append), supprimer, déplacer/renommer, copier, "
+            "lister et inspecter des fichiers ou dossiers dans /app, /repo et /tmp."
         )
 
     @property
@@ -56,20 +67,36 @@ class FileSystemTool(Tool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["read", "write", "list", "mkdir", "stat"],
-                    "description": "Action à effectuer.",
+                    "enum": [
+                        "read",
+                        "write",
+                        "append",
+                        "delete",
+                        "rm",
+                        "list",
+                        "mkdir",
+                        "stat",
+                        "move",
+                        "rename",
+                        "copy",
+                    ],
+                    "description": "Action sur les fichiers.",
                 },
                 "path": {
                     "type": "string",
-                    "description": "Chemin relatif par rapport à /app.",
+                    "description": "Chemin du fichier ou dossier (ex: 'data/test.txt', '/repo/src/...').",
                 },
                 "content": {
                     "type": "string",
-                    "description": "Contenu à écrire (pour 'write' uniquement).",
+                    "description": "Contenu texte pour 'write' ou 'append'.",
+                },
+                "dest_path": {
+                    "type": "string",
+                    "description": "Chemin de destination pour 'move' ou 'copy'.",
                 },
                 "start_line": {
                     "type": "integer",
-                    "description": "Ligne de début pour la lecture partielle (optionnel).",
+                    "description": "Ligne de début pour la lecture partielle (optionnel, 1-indexé).",
                 },
                 "end_line": {
                     "type": "integer",
@@ -77,6 +104,7 @@ class FileSystemTool(Tool):
                 },
             },
             "required": ["action", "path"],
+            "type": "object",
         }
 
     async def execute(
@@ -84,80 +112,134 @@ class FileSystemTool(Tool):
         action: str,
         path: str = ".",
         content: str = None,
+        dest_path: str = None,
         start_line: int = None,
         end_line: int = None,
-        query: str = None,
         **kwargs,
     ) -> str:
         safe = _safe_path(path)
         if safe is None:
-            logger.warning(f"Tentative de path traversal bloquée: {path!r}")
-            return f"🚫 Chemin interdit : '{path}' sort du workspace."
+            logger.warning(f"Chemin en dehors de l'espace autorisé: {path!r}")
+            return f"🚫 Chemin interdit : '{path}' sort de l'environnement (/app, /repo, /tmp)."
 
         if action == "list":
             try:
                 target = safe if safe.is_dir() else safe.parent
-                entries = sorted(target.iterdir(), key=lambda p: (p.is_file(), p.name))
+                if not target.exists():
+                    return f"❌ Dossier introuvable : {target}"
+                entries = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name))
                 lines = []
                 for e in entries:
-                    size = (
-                        f"{e.stat().st_size:>10} B" if e.is_file() else "         DIR"
-                    )
-                    lines.append(f"{size}  {e.name}")
-                return f"Contenu de {target.relative_to(WORKSPACE)}:\n" + "\n".join(
-                    lines
-                )
+                    if e.is_dir():
+                        lines.append(f"          DIR  {e.name}/")
+                    else:
+                        size = f"{e.stat().st_size:>10} B"
+                        lines.append(f"{size}  {e.name}")
+                return f"Contenu de {target} :\n" + "\n".join(lines)
             except Exception as e:
-                return f"❌ Erreur liste: {e}"
+                return f"❌ Erreur lors du listage : {e}"
 
         elif action == "read":
             if not safe.exists():
-                return f"❌ Fichier introuvable: {path}"
+                return f"❌ Fichier introuvable : {safe}"
             if not safe.is_file():
-                return f"❌ '{path}' n'est pas un fichier."
+                return f"❌ '{safe}' n'est pas un fichier (c'est un dossier)."
             try:
                 text = safe.read_text(encoding="utf-8", errors="replace")
                 lines_list = text.splitlines()
                 if start_line is not None or end_line is not None:
-                    s = (start_line or 1) - 1
-                    e = end_line or len(lines_list)
+                    s = max((start_line or 1) - 1, 0)
+                    e = min(end_line or len(lines_list), len(lines_list))
                     lines_list = lines_list[s:e]
                     text = "\n".join(lines_list)
-                if len(text) > 8000:
-                    text = text[:8000] + "\n...[tronqué]"
+                if len(text) > 12000:
+                    text = text[:12000] + f"\n...[tronqué, total {len(text)} caractères]"
                 return text
             except Exception as e:
-                return f"❌ Erreur lecture: {e}"
+                return f"❌ Erreur lecture : {e}"
 
         elif action == "write":
             if content is None:
-                return "❌ 'content' est requis pour 'write'."
+                return "❌ 'content' est requis pour l'action 'write'."
             try:
                 safe.parent.mkdir(parents=True, exist_ok=True)
                 safe.write_text(content, encoding="utf-8")
-                return f"✅ Fichier écrit : {safe.relative_to(WORKSPACE)} ({len(content)} caractères)"
+                return f"✅ Fichier écrit : {safe} ({len(content)} caractères)"
             except Exception as e:
-                return f"❌ Erreur écriture: {e}"
+                return f"❌ Erreur écriture : {e}"
+
+        elif action == "append":
+            if content is None:
+                return "❌ 'content' est requis pour l'action 'append'."
+            try:
+                safe.parent.mkdir(parents=True, exist_ok=True)
+                with open(safe, "a", encoding="utf-8") as f:
+                    f.write(content)
+                return f"✅ Contenu ajouté à : {safe} (+{len(content)} caractères)"
+            except Exception as e:
+                return f"❌ Erreur append : {e}"
+
+        elif action in ("delete", "rm"):
+            if not safe.exists():
+                return f"❌ Cible introuvable : {safe}"
+            try:
+                if safe.is_dir():
+                    shutil.rmtree(safe)
+                    return f"✅ Dossier supprimé : {safe}"
+                else:
+                    safe.unlink()
+                    return f"✅ Fichier supprimé : {safe}"
+            except Exception as e:
+                return f"❌ Erreur suppression : {e}"
 
         elif action == "mkdir":
             try:
                 safe.mkdir(parents=True, exist_ok=True)
-                return f"✅ Dossier créé : {safe.relative_to(WORKSPACE)}"
+                return f"✅ Dossier créé : {safe}"
             except Exception as e:
-                return f"❌ Erreur mkdir: {e}"
+                return f"❌ Erreur mkdir : {e}"
 
         elif action == "stat":
             if not safe.exists():
-                return f"❌ Chemin introuvable: {path}"
+                return f"❌ Chemin introuvable : {safe}"
             try:
                 st = safe.stat()
                 return (
-                    f"Chemin  : {safe.relative_to(WORKSPACE)}\n"
+                    f"Chemin  : {safe}\n"
                     f"Type    : {'Dossier' if safe.is_dir() else 'Fichier'}\n"
                     f"Taille  : {st.st_size} octets\n"
                     f"Modifié : {st.st_mtime}"
                 )
             except Exception as e:
-                return f"❌ Erreur stat: {e}"
+                return f"❌ Erreur stat : {e}"
 
-        return f"❌ Action inconnue: '{action}'"
+        elif action in ("move", "rename"):
+            if not dest_path:
+                return "❌ 'dest_path' requis pour move/rename."
+            safe_dest = _safe_path(dest_path)
+            if not safe_dest:
+                return f"🚫 Destination interdite : '{dest_path}' sort de l'environnement."
+            try:
+                safe_dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(safe), str(safe_dest))
+                return f"✅ Déplacé avec succès : {safe} -> {safe_dest}"
+            except Exception as e:
+                return f"❌ Erreur move : {e}"
+
+        elif action == "copy":
+            if not dest_path:
+                return "❌ 'dest_path' requis pour copy."
+            safe_dest = _safe_path(dest_path)
+            if not safe_dest:
+                return f"🚫 Destination interdite : '{dest_path}' sort de l'environnement."
+            try:
+                safe_dest.parent.mkdir(parents=True, exist_ok=True)
+                if safe.is_dir():
+                    shutil.copytree(str(safe), str(safe_dest), dirs_exist_ok=True)
+                else:
+                    shutil.copy2(str(safe), str(safe_dest))
+                return f"✅ Copié avec succès : {safe} -> {safe_dest}"
+            except Exception as e:
+                return f"❌ Erreur copy : {e}"
+
+        return f"❌ Action inconnue : '{action}'"

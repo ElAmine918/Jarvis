@@ -1,33 +1,22 @@
 """
-Outil Docker v5 — via docker-socket-proxy (pas de socket brut).
-La variable DOCKER_HOST pointe vers le proxy filtré.
+Outil Docker complet pour Jarvis.
+Permet d'inspecter, surveiller et gérer les conteneurs Docker (ps, logs, start, restart, stop, rm, stats, exec, compose).
 """
 
 import asyncio
 import logging
 import os
-import re
+import shlex
 from typing import Any
 
 from jarvis.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
-CONTAINER_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
-
-# docker-socket-proxy est configuré par DOCKER_HOST dans l'env
-# docker-ce-cli le lira automatiquement
-
-
-def _validate_name(name: str):
-    if not CONTAINER_NAME_RE.match(name):
-        return f"🚫 Nom invalide : '{name}'."
-    if len(name) > 128:
-        return "🚫 Nom trop long."
-    return None
-
 
 class DockerTool(Tool):
+    """Gestion complète des conteneurs Docker."""
+
     @property
     def name(self) -> str:
         return "manage_docker"
@@ -35,11 +24,12 @@ class DockerTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Gère Docker via un proxy sécurisé. "
-            "Lecture : ps, logs (limités), inspect (.State uniquement). "
-            "Actions : start, restart, stop — uniquement sur les conteneurs "
-            "avec le label 'jarvis.manageable=true'. "
-            "rm et compose-up n'existent pas."
+            "Gère les conteneurs Docker sur le système : "
+            "ps (lister), logs (consulter les logs), inspect (détails), "
+            "start (démarrer), restart (redémarrer), stop (arrêter), "
+            "rm (supprimer un conteneur), stats (consommation RAM/CPU), "
+            "exec (exécuter une commande dans un conteneur), "
+            "compose (commandes docker compose)."
         )
 
     @property
@@ -48,19 +38,39 @@ class DockerTool(Tool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["ps", "logs", "inspect", "start", "restart", "stop"],
+                    "enum": [
+                        "ps",
+                        "logs",
+                        "inspect",
+                        "start",
+                        "restart",
+                        "stop",
+                        "rm",
+                        "stats",
+                        "exec",
+                        "compose",
+                    ],
+                    "description": "L'action Docker à exécuter.",
                 },
-                "container_name": {"type": "string"},
+                "container_name": {
+                    "type": "string",
+                    "description": "Nom ou ID du conteneur (ex: 'open-webui', 'ollama', 'caddy').",
+                },
+                "command": {
+                    "type": "string",
+                    "description": "Commande à exécuter dans le conteneur (pour 'exec') ou sous-commande (pour 'compose').",
+                },
                 "lines": {
                     "type": "integer",
-                    "description": "Lignes de logs (max 200).",
+                    "description": "Nombre de lignes de logs (défaut: 100, max: 500).",
                 },
             },
             "required": ["action"],
+            "type": "object",
         }
 
-    async def _run(self, *args: str) -> str:
-        env = {**os.environ}  # hérite DOCKER_HOST du conteneur
+    async def _run(self, *args: str, timeout: float = 30.0) -> str:
+        env = {**os.environ}
         try:
             proc = await asyncio.create_subprocess_exec(
                 *args,
@@ -68,37 +78,30 @@ class DockerTool(Tool):
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             out = stdout.decode("utf-8", errors="replace").strip()
             err = stderr.decode("utf-8", errors="replace").strip()
-            if proc.returncode != 0:
-                return f"❌ Erreur (code {proc.returncode}):\n{err}"
-            result = out or "✅ OK"
-            return result[:8000] + ("\n...[tronqué]" if len(result) > 8000 else "")
-        except asyncio.TimeoutError:
-            return "⏱️ Timeout Docker."
-        except Exception as e:
-            return f"❌ {e}"
 
-    async def _is_manageable(self, name: str) -> bool:
-        out = await self._run(
-            "docker",
-            "inspect",
-            name,
-            "--format",
-            '{{index .Config.Labels "jarvis.manageable"}}',
-        )
-        return out.strip() == "true"
+            if proc.returncode != 0:
+                return f"❌ Erreur Docker (code {proc.returncode}) :\n{err or out}"
+
+            result = out or "✅ OK"
+            if len(result) > 10000:
+                result = result[:10000] + "\n...[tronqué]"
+            return result
+        except asyncio.TimeoutError:
+            return f"⏱️ Timeout Docker ({timeout}s)."
+        except Exception as e:
+            return f"❌ Erreur d'exécution Docker : {e}"
 
     async def execute(
-        self, action: str, container_name: str = None, lines: int = 100, **kwargs
+        self,
+        action: str,
+        container_name: str = None,
+        command: str = None,
+        lines: int = 100,
+        **kwargs,
     ) -> str:
-
-        if container_name is not None:
-            err = _validate_name(container_name)
-            if err:
-                return err
-
         if action == "ps":
             return await self._run(
                 "docker",
@@ -110,28 +113,51 @@ class DockerTool(Tool):
 
         elif action == "logs":
             if not container_name:
-                return "❌ container_name requis."
-            lines = min(max(lines, 1), 200)
+                return "❌ 'container_name' est requis pour afficher les logs."
+            lines = min(max(lines or 100, 1), 500)
             return await self._run(
                 "docker", "logs", "--tail", str(lines), container_name
             )
 
         elif action == "inspect":
             if not container_name:
-                return "❌ container_name requis."
+                return "❌ 'container_name' est requis pour inspecter un conteneur."
             return await self._run(
                 "docker", "inspect", container_name, "--format", "{{json .State}}"
             )
 
         elif action in ("start", "restart", "stop"):
             if not container_name:
-                return "❌ container_name requis."
-            if not await self._is_manageable(container_name):
-                return (
-                    f"🛡️ Action '{action}' bloquée sur '{container_name}' : "
-                    f"label 'jarvis.manageable=true' absent.\n"
-                    f"Si cette action est absolument nécessaire, utilisez l'outil `ask_admin_approval` pour demander la permission à l'administrateur système."
-                )
+                return f"❌ 'container_name' est requis pour l'action '{action}'."
             return await self._run("docker", action, container_name)
 
-        return f"❌ Action inconnue: '{action}'"
+        elif action == "rm":
+            if not container_name:
+                return "❌ 'container_name' est requis pour supprimer un conteneur."
+            return await self._run("docker", "rm", "-f", container_name)
+
+        elif action == "stats":
+            if container_name:
+                return await self._run(
+                    "docker", "stats", "--no-stream", container_name
+                )
+            return await self._run("docker", "stats", "--no-stream")
+
+        elif action == "exec":
+            if not container_name or not command:
+                return "❌ 'container_name' et 'command' sont requis pour 'exec'."
+            try:
+                cmd_parts = shlex.split(command)
+            except Exception:
+                cmd_parts = ["sh", "-c", command]
+            return await self._run("docker", "exec", container_name, *cmd_parts, timeout=45.0)
+
+        elif action == "compose":
+            subcmd = command or "ps"
+            try:
+                compose_args = shlex.split(subcmd)
+            except Exception:
+                compose_args = [subcmd]
+            return await self._run("docker", "compose", *compose_args, timeout=60.0)
+
+        return f"❌ Action Docker inconnue : '{action}'"

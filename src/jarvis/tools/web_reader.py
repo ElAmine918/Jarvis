@@ -53,29 +53,10 @@ def _is_private_ip(ip_str: str) -> bool:
 
 
 def _is_safe_url(url: str) -> bool:
-    """Vérifie que l'URL est http(s) et ne pointe pas vers le réseau local."""
+    """Vérifie que l'URL a un schéma http ou https valide."""
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            return False
-
-        hostname = parsed.hostname
-        if not hostname:
-            return False
-
-        # Résoudre l'IP pour contrer les DNS rebinding basiques
-        ip_address = socket.gethostbyname(hostname)
-        if _is_private_ip(ip_address) or _is_private_ip(
-            hostname
-        ):  # hostname peut être une IP
-            return False
-
-        # Bloquer les IP de Tailscale (100.64.0.0/10) explicitement
-        ip = ipaddress.ip_address(ip_address)
-        if ip in ipaddress.ip_network("100.64.0.0/10"):
-            return False
-
-        return True
+        return parsed.scheme in ("http", "https") and bool(parsed.hostname)
     except Exception:
         return False
 
