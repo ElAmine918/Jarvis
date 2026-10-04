@@ -88,9 +88,28 @@ def log_conversation(
         "INSERT INTO conversations (id, session_id, source, user_id, message_in, message_out, model_used) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (conv_id, session_id, source, user_id, message_in, message_out, model_used),
     )
-    conn.commit()
+conn.commit()
     conn.close()
+    
+    # Try async vector ingestion if running in an async context
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        async def _ingest():
+            try:
+                from jarvis.storage.vector_memory import get_db_pool, ingest_message
+                pool = await get_db_pool()
+                await ingest_message(pool, source, session_id, conv_id + "_in", "user", message_in, 1)
+                await ingest_message(pool, source, session_id, conv_id + "_out", "assistant", message_out, 2)
+                await pool.close()
+            except Exception as e:
+                pass
+        loop.create_task(_ingest())
+    except Exception:
+        pass
+        
     return conv_id
+
 
 
 def log_action(

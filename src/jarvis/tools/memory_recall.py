@@ -122,27 +122,37 @@ class MemoryRecallTool(Tool):
             elif query_type == "search":
                 if not keyword:
                     return "Erreur : Le mot-clé est requis pour le type de recherche 'search'."
-
-                search_term = f"%{keyword}%"
-                cursor.execute(
-                    "SELECT timestamp, message_in, message_out FROM conversations WHERE timestamp >= ? AND (message_in LIKE ? OR message_out LIKE ?) ORDER BY timestamp DESC LIMIT ?",
-                    (cutoff_date, search_term, search_term, limit),
-                )
-                rows = cursor.fetchall()
-                if not rows:
-                    result_text += f"- Aucun résultat trouvé pour '{keyword}'."
-                for row in rows:
-                    msg_in = (
-                        str(row[1])[:100] + "..."
-                        if len(str(row[1])) > 100
-                        else str(row[1])
+                    
+                try:
+                    from jarvis.storage.vector_memory import get_db_pool, search_memory
+                    pool = await get_db_pool()
+                    try:
+                        results = await search_memory(pool, keyword, limit=limit)
+                        if not results:
+                            result_text += f"- Aucun résultat trouvé pour '{keyword}' dans la mémoire sémantique."
+                        for r in results:
+                            c = str(r['content'])[:150] + "..." if len(str(r['content'])) > 150 else str(r['content'])
+                            result_text += f"
+- [Score: {r['score']:.2f} | Conv: {r['conversation_id'][:8]}] {c}"
+                    finally:
+                        await pool.close()
+                except ImportError:
+                    # Fallback au SQLite basique si asyncpg n'est pas installé
+                    search_term = f"%{keyword}%"
+                    cursor.execute(
+                        "SELECT timestamp, message_in, message_out FROM conversations WHERE timestamp >= ? AND (message_in LIKE ? OR message_out LIKE ?) ORDER BY timestamp DESC LIMIT ?",
+                        (cutoff_date, search_term, search_term, limit),
                     )
-                    msg_out = (
-                        str(row[2])[:100] + "..."
-                        if len(str(row[2])) > 100
-                        else str(row[2])
-                    )
-                    result_text += f"\n- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+                    rows = cursor.fetchall()
+                    if not rows:
+                        result_text += f"- Aucun résultat trouvé pour '{keyword}'."
+                    for row in rows:
+                        msg_in = str(row[1])[:100] + "..." if len(str(row[1])) > 100 else str(row[1])
+                        msg_out = str(row[2])[:100] + "..." if len(str(row[2])) > 100 else str(row[2])
+                        result_text += f"
+- [{row[0]}] User: {msg_in} | Jarvis: {msg_out}"
+                except Exception as e:
+                    return f"Erreur avec la recherche vectorielle : {e}"
 
             else:
                 return f"Erreur : Type de requête '{query_type}' non reconnu."
