@@ -46,10 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 # Créer un utilisateur non-root dédié (UID/GID 1001)
-# --no-create-home : pas de home directory sur le disque
+# --home-dir /app : pas de home directory sur le disque
 # --shell /usr/sbin/nologin : aucun accès shell interactif
 RUN groupadd --gid 1001 jarvis \
-    && useradd --uid 1001 --gid 1001 --no-create-home --shell /usr/sbin/nologin jarvis
+    && useradd --uid 1001 --gid 1001 --home-dir /app --shell /usr/sbin/nologin jarvis
 
 # Créer les dossiers applicatifs avec les bonnes permissions
 RUN mkdir -p /app/data/skills /app/workspace /app/jarvis \
