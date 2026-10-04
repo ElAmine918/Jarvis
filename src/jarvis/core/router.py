@@ -38,6 +38,12 @@ def get_model_stats(model_name: str) -> dict:
             stats = {"score": 90, "speed": "fast"}
         else:
             stats = {"score": 75, "speed": "fast"}
+# Groq (Modèles 2026)
+    elif "gpt-oss-120b" in name_lower:
+        stats = {"score": 95, "speed": "fast"}
+    elif "qwen3.8-27b" in name_lower:
+        stats = {"score": 88, "speed": "fast"}
+
     # Mixtral (Groq / Local)
     elif "mixtral" in name_lower:
         stats = {"score": 85, "speed": "fast"}

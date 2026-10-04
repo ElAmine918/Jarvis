@@ -147,9 +147,18 @@ class JarvisAgent:
             for b_name, client, model in backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
                 try:
+                    # FIX: Google Gemini strict validation requires ALL past tool calls to have a text content ("thought_signature")
+                    sanitized_history = []
+                    for msg in history:
+                        msg_copy = msg.copy()
+                        if msg_copy.get("role") == "assistant" and "tool_calls" in msg_copy:
+                            if not msg_copy.get("content"):
+                                msg_copy["content"] = "Exécution en cours..."
+                        sanitized_history.append(msg_copy)
+
                     stream_response = await client.chat.completions.create(
                         model=model,
-                        messages=history,
+                        messages=sanitized_history,
                         tools=tools,
                         tool_choice="auto",
                         max_tokens=4096,
