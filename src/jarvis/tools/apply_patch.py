@@ -40,7 +40,7 @@ class ApplyPatchTool(Tool):
         }
 
     async def execute(self, **kwargs) -> str:
-        from jarvis.filesystem import _safe_path
+        from jarvis.tools.filesystem import _safe_path
 
         file_path = kwargs.get("file_path")
         search_text = kwargs.get("search_text")

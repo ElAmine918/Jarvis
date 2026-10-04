@@ -89,8 +89,19 @@ def mark_model_dead(model_name: str, error_str: str):
     if "404" in error_lower:
         cooldown = 315360000  # 10 ans (Modèle supprimé)
         logger.info(f"Circuit Breaker: {model_name} banni (404 Not Found).")
+    elif "400" in error_lower or "invalid_argument" in error_lower or "thought_signature" in error_lower:
+        cooldown = 10  # 10s (Erreur de validation de payload, pas une panne du modèle)
+        logger.info(
+            f"Circuit Breaker: {model_name} cooldown court 10s (Erreur requête 400)."
+        )
     elif "429" in error_lower:
-        if "day" in error_lower or "quota" in error_lower:
+        # Attention: éviter de matcher 'today' dans l'URL Groq comme un quota journalier
+        is_daily_quota = (
+            ("per day" in error_lower or "per-day" in error_lower or "daily" in error_lower)
+            and "tokens per minute" not in error_lower
+            and "otpm" not in error_lower
+        )
+        if is_daily_quota:
             cooldown = 86400  # 24h
             logger.info(
                 f"Circuit Breaker: {model_name} banni pour 24h (Quota Journalier Atteint)."
@@ -101,7 +112,7 @@ def mark_model_dead(model_name: str, error_str: str):
                 f"Circuit Breaker: {model_name} banni pour 5m (Serveur Upstream Congestionné)."
             )
         else:
-            cooldown = 60  # 1m
+            cooldown = 60  # 1m (Rate limit / OTPM)
             logger.info(f"Circuit Breaker: {model_name} banni pour 1m (Rate Limit).")
     elif "503" in error_lower or "502" in error_lower:
         cooldown = 900  # 15m
@@ -156,25 +167,22 @@ _gemini_models_cache_time = 0
 
 
 async def get_dynamic_gemini_models(api_key: str, primary_model: str) -> list:
-    # Explicit list of text-out models from user dashboard (excluding lite)
+    # Explicit list of active text/chat models (excluding discontinued / 404 models)
     models = [
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
-        "gemini-3.1-pro",
-        "gemini-3.0-flash",
-        "gemini-2.5-pro",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-1.5-pro",
-        "gemini-1.5-flash"
+        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.1-pro-preview",
+        "gemini-flash-latest",
+        "gemini-pro-latest",
     ]
-    
+
     final_models = [primary_model] if primary_model and primary_model not in models else []
     for m in models:
         final_models.append(m)
-        
+
     return final_models
 
 
@@ -205,6 +213,16 @@ async def get_dynamic_groq_models(api_key: str, primary_model: str) -> list:
                         # Filter out whisper (audio) and pure safeguard models
                         if "whisper" not in name and "safeguard" not in name and "guard" not in name:
                             models.append(name)
+                    priority_order = [
+                        "openai/gpt-oss-120b",
+                        "openai/gpt-oss-20b",
+                        "qwen/qwen3.8-27b",
+                    ]
+                    models.sort(
+                        key=lambda x: priority_order.index(x)
+                        if x in priority_order
+                        else 99
+                    )
                     _groq_models_cache = models
                     _groq_models_cache_time = time.time()
                 else:

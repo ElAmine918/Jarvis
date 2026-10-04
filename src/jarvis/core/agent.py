@@ -161,21 +161,55 @@ class JarvisAgent:
             for b_name, client, model in backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
                 try:
-                    # FIX: Google Gemini strict validation requires ALL past tool calls to have a text content ("thought_signature")
+                    # FIX: Google Gemini strict validation requires proprietary thought_signature on toolCall parts.
+                    # For Gemini, convert past tool calls and tool responses into clean conversational context.
                     sanitized_history = []
-                    for msg in history:
-                        msg_copy = msg.copy()
-                        if msg_copy.get("role") == "assistant" and "tool_calls" in msg_copy:
-                            if not msg_copy.get("content"):
-                                msg_copy["content"] = "Exécution en cours..."
-                        sanitized_history.append(msg_copy)
+                    if "Gemini" in b_name:
+                        for msg in history:
+                            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                                tc_descriptions = []
+                                for tc in msg["tool_calls"]:
+                                    fn = tc.get("function", {})
+                                    tc_descriptions.append(
+                                        f"{fn.get('name', 'action')}({fn.get('arguments', '')})"
+                                    )
+                                text_content = msg.get("content") or ""
+                                text_content += (
+                                    f"\n[Action exécutée : {', '.join(tc_descriptions)}]"
+                                )
+                                sanitized_history.append(
+                                    {
+                                        "role": "assistant",
+                                        "content": text_content.strip(),
+                                    }
+                                )
+                            elif msg.get("role") == "tool":
+                                sanitized_history.append(
+                                    {
+                                        "role": "user",
+                                        "content": f"[Résultat de l'action] :\n{msg.get('content', '')}",
+                                    }
+                                )
+                            else:
+                                sanitized_history.append(msg.copy())
+                    else:
+                        for msg in history:
+                            msg_copy = msg.copy()
+                            if (
+                                msg_copy.get("role") == "assistant"
+                                and "tool_calls" in msg_copy
+                            ):
+                                if not msg_copy.get("content"):
+                                    msg_copy["content"] = "Exécution en cours..."
+                            sanitized_history.append(msg_copy)
 
+                    current_max_tokens = 800 if "Groq" in b_name else 4096
                     stream_response = await client.chat.completions.create(
                         model=model,
                         messages=sanitized_history,
                         tools=tools,
                         tool_choice="auto",
-                        max_tokens=4096,
+                        max_tokens=current_max_tokens,
                         temperature=0.7,
                         stream=True,
                     )

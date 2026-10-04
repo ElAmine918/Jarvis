@@ -84,7 +84,7 @@ class ProxmoxActionTool(Tool):
     def description(self) -> str:
         return (
             "Demande à l'administrateur système (Amine) d'approuver une action Proxmox "
-            "(start, stop, reboot d'une VM/LXC). "
+            "(start, stop, reboot, destroy, delete, rm d'une VM/LXC). "
             "Le script s'interrompt jusqu'à ce que l'administrateur clique sur un bouton dans Telegram."
         )
 
@@ -94,11 +94,11 @@ class ProxmoxActionTool(Tool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "description": "L'action à effectuer ('start', 'stop', 'reboot')",
+                    "description": "L'action à effectuer ('start', 'stop', 'reboot', 'destroy', 'delete')",
                 },
                 "vmid": {
                     "type": "string",
-                    "description": "L'ID de la VM ou du conteneur (ex: '100')",
+                    "description": "L'ID de la VM ou du conteneur (ex: '100', '101')",
                 },
                 "vm_type": {
                     "type": "string",
@@ -118,7 +118,7 @@ class ProxmoxActionTool(Tool):
         if not TELEGRAM_BOT_TOKEN or not ALLOWED_TELEGRAM_USER_IDS:
             return "❌ Impossible: Telegram n'est pas configuré pour les approbations."
 
-        _ALLOWED_ACTIONS = {"start", "stop", "reboot"}
+        _ALLOWED_ACTIONS = {"start", "stop", "reboot", "destroy", "delete", "rm"}
         if action not in _ALLOWED_ACTIONS:
             return f"🚫 Sécurité : action Proxmox '{action}' non autorisée."
 
@@ -191,7 +191,16 @@ class ProxmoxActionTool(Tool):
                 await asyncio.to_thread(resource.status.stop.post)
             elif action == "reboot":
                 await asyncio.to_thread(resource.status.reboot.post)
+            elif action in {"destroy", "delete", "rm"}:
+                # Ensure the container/VM is stopped first if it was running
+                try:
+                    await asyncio.to_thread(resource.status.stop.post)
+                    await asyncio.sleep(2)
+                except Exception:
+                    pass
+                # Delete the resource with purge=1
+                await asyncio.to_thread(resource.delete, purge=1)
 
-            return "✅ L'administrateur a approuvé et l'action Proxmox a été envoyée avec succès."
+            return f"✅ L'administrateur a approuvé et l'action Proxmox '{action}' sur {vm_type} {vmid} a été exécutée avec succès."
         except Exception as e:
             return f"❌ Action approuvée mais erreur Proxmox : {e}"
