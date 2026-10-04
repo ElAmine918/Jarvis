@@ -38,7 +38,7 @@ case "$1" in
     deploy)
         print_header
         echo -e "${YELLOW}📦 [1/4] Création de l'archive de mise à jour...${NC}"
-        tar -czf jarvis_update.tar.gz -C "$BASE_DIR" src/jarvis data/rules data/skills db scripts requirements.txt Dockerfile .env.example docker-compose.yml Caddyfile
+        tar -czf jarvis_update.tar.gz -C "$BASE_DIR" src/jarvis data tests pyproject.toml pytest.ini db scripts requirements.txt Dockerfile .env.example docker-compose.yml Caddyfile
 
         echo -e "${BLUE}🚀 [2/4] Copie de l'archive vers Proxmox VE (pve)...${NC}"
         scp jarvis_update.tar.gz pve:/tmp/
