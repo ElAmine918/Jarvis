@@ -202,7 +202,13 @@ class JarvisAgent:
                 ):
                     continue
                 clean_content = content.split("\n\n— ")[0]
-                filtered_msgs.append({"role": m["role"], "content": clean_content})
+                lines = [
+                    l for l in clean_content.splitlines()
+                    if not (l.strip().startswith("⚙️") or "Action système exécutée" in l or "Exécution de l'outil en cours" in l)
+                ]
+                clean_content = "\n".join(lines).strip()
+                if clean_content:
+                    filtered_msgs.append({"role": m["role"], "content": clean_content})
                 if m["role"] == "user":
                     user_context_text += " " + clean_content
 
@@ -330,6 +336,8 @@ class JarvisAgent:
                             continue
                         delta = chunk.choices[0].delta
                         if delta.content:
+                            if "(Action système exécutée" in delta.content or "Exécution de l'outil en cours" in delta.content:
+                                continue
                             final_text += delta.content
                             yield delta.content
                             if delta.content:
