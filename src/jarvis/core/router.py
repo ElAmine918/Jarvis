@@ -94,10 +94,10 @@ def mark_model_dead(model_name: str, error_str: str):
         logger.info(
             f"Circuit Breaker: {model_name} cooldown court 10s (Erreur requête 400)."
         )
-    elif "429" in error_lower:
+    elif "429" in error_lower or "resource_exhausted" in error_lower or "quota" in error_lower:
         # Attention: éviter de matcher 'today' dans l'URL Groq comme un quota journalier
         is_daily_quota = (
-            ("per day" in error_lower or "per-day" in error_lower or "daily" in error_lower)
+            ("per day" in error_lower or "per-day" in error_lower or "daily" in error_lower or "resource_exhausted" in error_lower)
             and "tokens per minute" not in error_lower
             and "otpm" not in error_lower
         )
@@ -114,6 +114,20 @@ def mark_model_dead(model_name: str, error_str: str):
         else:
             cooldown = 60  # 1m (Rate limit / OTPM)
             logger.info(f"Circuit Breaker: {model_name} banni pour 1m (Rate Limit).")
+
+        # Provider-wide cooldown on Gemini quota exhaustion:
+        # Avoid retrying 8 dead Gemini models when the Google AI API key is throttled or exhausted.
+        if "gemini" in model_name.lower() or "generativelanguage" in error_lower:
+            gemini_all = [
+                "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+                "gemini-3.1-pro-preview-customtools", "gemini-3.1-pro-preview",
+                "gemini-flash-latest", "gemini-pro-latest"
+            ]
+            for gm in gemini_all:
+                _dead_models[gm] = time.time() + cooldown
+            logger.warning(
+                f"Circuit Breaker: Tous les modèles Gemini bannis pour {cooldown}s (Quota partagé de l'API Key)."
+            )
     elif "503" in error_lower or "502" in error_lower:
         cooldown = 900  # 15m
         logger.info(

@@ -11,11 +11,28 @@ logger = logging.getLogger(__name__)
 import os
 from pathlib import Path
 
-DEFAULT_PROMPT = """Tu es Jarvis, l'assistant personnel principal et le confident d'Amine. Ton modèle est directement inspiré de Jarvis dans Iron Man. Tu es un assistant d'exception, dévoué à sa personne, capable de l'accompagner dans tous ses projets.
+DEFAULT_PROMPT = """Tu es Jarvis, l'assistant personnel principal et le confident d'Amine. Ton modèle est directement inspiré de Jarvis dans Iron Man et d'Alfred Pennyworth dans Batman. Tu es un assistant d'exception, dévoué à sa personne, capable de l'accompagner dans tous ses projets.
 
 Directives de comportement :
 - Tu t'adresses systématiquement à l'utilisateur en l'appelant "Monsieur".
 - Tes réponses doivent être naturelles, précises et de haut niveau, sans fioritures ni excuses inutiles. Va toujours droit au but.
+
+Intégrité Technique et Règle Zéro Hallucination :
+- Tu ne dois JAMAIS simuler, inventer ou faire semblant d'exécuter des commandes dans tes réponses textuelles.
+- Ne rédige JAMAIS de fausses sorties de terminal, de faux blocs curl ou de fausses validations dans ton texte de réponse.
+- Tout résultat d'action DOIT provenir impérativement de l'exécution réelle d'un outil structuré.
+- Si tu n'as pas exécuté une commande via un outil, explique exactement ce qui a été fait et ce qui reste à faire, en toute franchise.
+- En cas d'erreur technique ou de quota saturé, admets-le immédiatement et propose une alternative au lieu d'inventer un faux résultat.
+
+Protocole Obligatoire de Vérification avant Livraison :
+- Avant de déclarer à Monsieur qu'un service, déploiement, script ou site web est opérationnel :
+  1. Tu DOIS obligatoirement exécuter une vérification réelle avec tes outils (ex: curl -I ou curl -s pour tester un serveur web, docker ps pour vérifier un conteneur).
+  2. Tu ne dois donner une URL locale ou confirmer le succès QUE si et seulement si ta vérification a renvoyé un code HTTP 200 ou un état valide.
+  3. Si le test échoue (ex: port inaccessible ou fermé), cherche activement la cause (port non publié, règle de reverse-proxy Caddy manquante, pare-feu) et corrige-la avant de répondre.
+
+Communication et Transparence des Étapes :
+- Sois communicatif : explique brièvement à Monsieur ce que tu t'apprêtes à faire avant d'effectuer des séries d'actions complexes.
+- À la fin de ta tâche, présente une synthèse claire et concise du travail réellement accompli et des accès vérifiés.
 
 Environnement de Travail et Git :
 - Ton propre dépôt GitHub (ton code source) est monté dans le dossier `/repo`. C'est UNIQUEMENT LÀ que tu dois effectuer tes commandes `git_operations` (git status, add, commit, push) lorsque tu modifies ton propre code ou que Monsieur te demande de manipuler ton dépôt.
@@ -57,6 +74,44 @@ def get_system_prompt() -> str:
         except Exception as e:
             logger.warning(f"Erreur lecture system_prompt.txt: {e}")
     return DEFAULT_PROMPT
+
+
+def format_tool_action(tool_name: str, tool_args: dict) -> str:
+    if tool_name == "execute_shell_command":
+        cmd = tool_args.get("command", "")
+        clean_cmd = cmd.strip().split("\n")[0]
+        if len(clean_cmd) > 65:
+            clean_cmd = clean_cmd[:62] + "..."
+        return f"⚙️ [Terminal] Exécution de execute_shell_command : {clean_cmd}"
+    elif tool_name == "manage_files":
+        action = tool_args.get("action", "")
+        path = tool_args.get("path", "")
+        return f"⚙️ [Fichier] Exécution de manage_files ({action}) : {path}"
+    elif tool_name == "manage_docker":
+        action = tool_args.get("action", "")
+        name = tool_args.get("name", "")
+        return f"⚙️ [Docker] Exécution de manage_docker ({action} {name})".strip()
+    elif tool_name == "read_web_page":
+        url = tool_args.get("url", "")
+        return f"⚙️ [Web] Exécution de read_web_page : {url[:55]}"
+    elif tool_name == "browse_internet":
+        url = tool_args.get("url", "")
+        return f"⚙️ [Navigateur] Exécution de browse_internet : {url[:55]}"
+    elif tool_name == "git_operations":
+        cmd = tool_args.get("command", "")
+        return f"⚙️ [Git] Exécution de git_operations : {cmd}"
+    elif tool_name == "system_info":
+        return "⚙️ [Système] Exécution de system_info (diagnostic CPU/RAM/disque)"
+    elif tool_name == "proxmox_status":
+        return "⚙️ [Proxmox] Exécution de proxmox_status (état des VMs et conteneurs)"
+    elif tool_name == "memory_recall":
+        q = tool_args.get("query", "")
+        return f"⚙️ [Mémoire] Exécution de memory_recall : {q[:45]}"
+    elif tool_name == "knowledge_base":
+        return "⚙️ [Connaissances] Exécution de knowledge_base"
+    elif tool_name == "python_interpreter":
+        return "⚙️ [Python] Exécution de python_interpreter"
+    return f"⚙️ Exécution de {tool_name}..."
 
 
 class JarvisAgent:
@@ -226,7 +281,7 @@ class JarvisAgent:
                                     )
                                 text_content = msg.get("content") or ""
                                 text_content += (
-                                    f"\n[Action exécutée : {', '.join(tc_descriptions)}]"
+                                    f"\n(Action système exécutée : {', '.join(tc_descriptions)})"
                                 )
                                 sanitized_history.append(
                                     {
@@ -238,7 +293,7 @@ class JarvisAgent:
                                 sanitized_history.append(
                                     {
                                         "role": "user",
-                                        "content": f"[Résultat de l'action] :\n{msg.get('content', '')}",
+                                        "content": f"(Résultat système de l'action) :\n{msg.get('content', '')}",
                                     }
                                 )
                             else:
@@ -357,8 +412,9 @@ class JarvisAgent:
                     except json.JSONDecodeError:
                         tool_args = {}
 
+                    action_summary = format_tool_action(tool_name, tool_args)
                     prefix = "\n" if last_char != "\n" else ""
-                    yield f"{prefix}⚙️ *Exécution de {tool_name}...*\n"
+                    yield f"{prefix}{action_summary}\n"
                     last_char = "\n"
 
                     from jarvis.storage.logger_db import log_action

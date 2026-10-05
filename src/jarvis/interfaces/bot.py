@@ -371,10 +371,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         response = ""
+        status_msg = None
+        last_status_edit = 0.0
 
-        # Attendre la réponse complète sans streaming ni message d'initialisation
+        # Suivi dynamique de l'avancement sans polluer la réponse finale
         async for chunk in agent.process_message(history, str(user_id)):
-            response += chunk
+            stripped = chunk.strip()
+            if stripped.startswith("⚙️") or stripped.startswith("⚠️"):
+                clean_status = stripped.replace("*", "")
+                now = datetime.datetime.now().timestamp()
+                if status_msg is None:
+                    try:
+                        status_msg = await update.message.reply_text(f"⏳ {clean_status}")
+                        last_status_edit = now
+                    except Exception as e:
+                        logger.debug(f"Impossible d'envoyer status_msg: {e}")
+                elif now - last_status_edit >= 1.5:
+                    try:
+                        await status_msg.edit_text(f"⏳ {clean_status}")
+                        last_status_edit = now
+                    except Exception as e:
+                        logger.debug(f"Impossible d'éditer status_msg: {e}")
+            else:
+                response += chunk
+
+        if status_msg:
+            try:
+                await status_msg.delete()
+            except Exception:
+                pass
+
+        if not response.strip():
+            response = "Opération terminée, Monsieur."
 
         history.append({"role": "assistant", "content": response})
 
@@ -457,7 +485,12 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         response = ""
         async for chunk in agent.process_message(history, str(user_id)):
-            response += chunk
+            stripped = chunk.strip()
+            if not (stripped.startswith("⚙️") or stripped.startswith("⚠️")):
+                response += chunk
+
+        if not response.strip():
+            response = "Opération terminée, Monsieur."
 
         history.append({"role": "assistant", "content": response})
 
