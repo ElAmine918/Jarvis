@@ -205,3 +205,60 @@ async def test_process_message_with_tool_call_flow(agent):
         assert "Exécution de system_info" in full_output
         assert "Il est 15h30." in full_output
         agent.tool_registry.execute_tool.assert_awaited_once_with("system_info", {"query": "time"})
+
+
+@pytest.mark.asyncio
+async def test_process_message_silent_model_forced_synthesis(agent):
+    """Vérifie que lorsqu'un modèle devient muet après avoir exécuté des outils,
+    une passe de synthèse forcée est déclenchée pour garantir un retour complet à Monsieur."""
+    messages = [{"role": "user", "content": "Vérifie le conteneur"}]
+
+    mock_func = MagicMock()
+    mock_func.name = "execute_shell_command"
+    mock_func.arguments = '{"command": "docker ps"}'
+
+    tc_item = MagicMock()
+    tc_item.index = 0
+    tc_item.id = "call_docker_1"
+    tc_item.function = mock_func
+
+    tc_chunk = MagicMock()
+    tc_delta = MagicMock(content=None, tool_calls=[tc_item])
+    tc_chunk.choices = [MagicMock(delta=tc_delta)]
+
+    # 2nd iteration: model finishes silently (content is empty)
+    silent_chunk = MagicMock()
+    silent_delta = MagicMock(content="", tool_calls=None)
+    silent_chunk.choices = [MagicMock(delta=silent_delta)]
+
+    # 3rd call (forced synthesis pass): generates the final Claude/Gemini-style answer
+    synth_chunk = MagicMock()
+    synth_delta = MagicMock(content="Monsieur, le conteneur Caddy est opérationnel sur le port 80.", tool_calls=None)
+    synth_chunk.choices = [MagicMock(delta=synth_delta)]
+
+    async def iter1_stream(*args, **kwargs):
+        yield tc_chunk
+
+    async def iter2_stream(*args, **kwargs):
+        yield silent_chunk
+
+    async def synth_stream(*args, **kwargs):
+        yield synth_chunk
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(side_effect=[iter1_stream(), iter2_stream(), synth_stream()])
+
+    agent.tool_registry.execute_tool = AsyncMock(return_value="CONTAINER ID: 1234 caddy Up 2 hours")
+
+    with (
+        patch.object(agent, "_get_backends_for_model", new_callable=AsyncMock) as mock_backends,
+        patch("jarvis.storage.logger_db.log_action"),
+    ):
+        mock_backends.return_value = [("Groq (qwen)", mock_client, "qwen")]
+        chunks = []
+        async for c in agent.process_message(messages, session_id="test"):
+            chunks.append(c)
+
+        full_output = "".join(chunks)
+        assert "execute_shell_command : docker ps" in full_output
+        assert "Monsieur, le conteneur Caddy est opérationnel" in full_output

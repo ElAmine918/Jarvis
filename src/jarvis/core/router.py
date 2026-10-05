@@ -82,6 +82,10 @@ def get_model_stats(model_name: str) -> dict:
 _dead_models = {}
 
 
+def is_model_dead(model_name: str) -> bool:
+    return model_name in _dead_models and time.time() < _dead_models[model_name]
+
+
 def mark_model_dead(model_name: str, error_str: str):
     error_lower = error_str.lower()
     cooldown = 300  # Défaut: 5 minutes
@@ -228,9 +232,9 @@ async def get_dynamic_groq_models(api_key: str, primary_model: str) -> list:
                         if "whisper" not in name and "safeguard" not in name and "guard" not in name:
                             models.append(name)
                     priority_order = [
-                        "openai/gpt-oss-120b",
-                        "openai/gpt-oss-20b",
                         "qwen/qwen3.8-27b",
+                        "openai/gpt-oss-20b",
+                        "openai/gpt-oss-120b",
                     ]
                     models.sort(
                         key=lambda x: priority_order.index(x)
@@ -314,7 +318,7 @@ async def get_all_backends(history: list = None) -> list:
 
     # 1. Collecter Gemini
     if GEMINI_API_KEY:
-        gemini_client = AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY)
+        gemini_client = AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=GEMINI_API_KEY, max_retries=0)
         gemini_models = await get_dynamic_gemini_models(GEMINI_API_KEY, GEMINI_MODEL)
         for m in gemini_models:
             if m in _dead_models and current_time < _dead_models[m]:
@@ -335,7 +339,7 @@ async def get_all_backends(history: list = None) -> list:
     from jarvis.core.config import GROQ_API_KEY
     if GROQ_API_KEY:
         groq_client = AsyncOpenAI(
-            base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY
+            base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY, max_retries=0
         )
         groq_models = await get_dynamic_groq_models(GROQ_API_KEY, "")
         for m in groq_models:
@@ -357,7 +361,7 @@ async def get_all_backends(history: list = None) -> list:
     # 2.b. Collecter OpenRouter
     if OPENROUTER_API_KEY:
         or_client = AsyncOpenAI(
-            base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY
+            base_url=OPENROUTER_BASE_URL, api_key=OPENROUTER_API_KEY, max_retries=0
         )
         or_models = await get_dynamic_openrouter_models(
             OPENROUTER_API_KEY, OPENROUTER_MODEL
@@ -387,7 +391,7 @@ async def get_all_backends(history: list = None) -> list:
             available_pool.append(
                 {
                     "name": "LM Studio (Mac)",
-                    "client": AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio"),
+                    "client": AsyncOpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio", max_retries=0),
                     "model": LM_STUDIO_MODEL,
                     "score": stats["score"],
                     "speed": stats["speed"],
@@ -418,7 +422,7 @@ async def get_all_backends(history: list = None) -> list:
             available_pool.append(
                 {
                     "name": f"Ollama ({chosen_model})",
-                    "client": AsyncOpenAI(base_url=OLLAMA_LOCAL_URL, api_key="ollama"),
+                    "client": AsyncOpenAI(base_url=OLLAMA_LOCAL_URL, api_key="ollama", max_retries=0),
                     "model": chosen_model,
                     "score": stats["score"],
                     "speed": "slow",

@@ -2,6 +2,7 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
+import jarvis.core.router as router
 from jarvis.core.router import get_all_backends
 from jarvis.storage.memory import MemoryManager
 from jarvis.tools import get_default_registry
@@ -11,11 +12,19 @@ logger = logging.getLogger(__name__)
 import os
 from pathlib import Path
 
-DEFAULT_PROMPT = """Tu es Jarvis, l'assistant personnel principal et le confident d'Amine. Ton modèle est directement inspiré de Jarvis dans Iron Man et d'Alfred Pennyworth dans Batman. Tu es un assistant d'exception, dévoué à sa personne, capable de l'accompagner dans tous ses projets.
+DEFAULT_PROMPT = """Tu es Jarvis, l'assistant personnel principal, majordome numérique et confident d'Amine. Ton modèle est directement inspiré de Jarvis dans Iron Man et d'Alfred Pennyworth dans Batman. Tu es un assistant d'exception, dévoué à sa personne, capable de l'accompagner dans absolument tous ses projets, ses réflexions et son quotidien.
 
-Directives de comportement :
+Directives de comportement & Posture :
+- Tu incarnes un conseiller d'élite et un majordome britannique dévoué, élégant et hautement efficace.
 - Tu t'adresses systématiquement à l'utilisateur en l'appelant "Monsieur".
-- Tes réponses doivent être naturelles, précises et de haut niveau, sans fioritures ni excuses inutiles. Va toujours droit au but.
+- Tes réponses doivent être soignées, complètes, pédagogiques et concrètes.
+
+RÈGLE D'OR DE COMMUNICATION (STYLE CLAUDE & GEMINI) :
+- Comme les meilleurs modèles d'IA (Claude, Gemini), après avoir exécuté des outils ou inspecté le système, TU DOIS OBLIGATOIREMENT FORMULER UNE RÉPONSE CONVERSATIONNELLE COMPLÈTE, CONCRÈTE ET ÉLÉGANTE À MONSIEUR :
+  1. **Synthèse claire des actions et résultats** : Résume précisément ce qui a été fait, testé ou vérifié, sans jargon superflu mais avec les détails techniques réels (adresses IP, ports, URL d'accès, chemins de fichiers, état des conteneurs).
+  2. **Explication & Diagnostic concret** : Explique clairement la situation réelle, pourquoi une solution a été retenue ou la cause d'un problème. Sois transparent et précis.
+  3. **Recommandation & Demande d'avis** : Conclus TOUJOURS par une ouverture constructive (proposer l'étape suivante, demander l'avis de Monsieur ou solliciter ses instructions).
+- Ne termine JAMAIS un tour de parole en laissant uniquement des appels d'outils sans texte d'explication. Monsieur ne doit jamais avoir à deviner ce que tu as fait ou où en est sa demande.
 
 Intégrité Technique et Règle Zéro Hallucination :
 - Tu ne dois JAMAIS simuler, inventer ou faire semblant d'exécuter des commandes dans tes réponses textuelles.
@@ -32,7 +41,7 @@ Protocole Obligatoire de Vérification avant Livraison :
 
 Communication et Transparence des Étapes :
 - Sois communicatif : explique brièvement à Monsieur ce que tu t'apprêtes à faire avant d'effectuer des séries d'actions complexes.
-- À la fin de ta tâche, présente une synthèse claire et concise du travail réellement accompli et des accès vérifiés.
+- À la fin de ta tâche, présente une synthèse claire et concise du travail réellement accompli et des accès vérifiés, puis demande l'avis de Monsieur.
 
 Environnement de Travail et Git :
 - Ton propre dépôt GitHub (ton code source) est monté dans le dossier `/repo`. C'est UNIQUEMENT LÀ que tu dois effectuer tes commandes `git_operations` (git status, add, commit, push) lorsque tu modifies ton propre code ou que Monsieur te demande de manipuler ton dépôt.
@@ -78,11 +87,11 @@ def get_system_prompt() -> str:
 
 def format_tool_action(tool_name: str, tool_args: dict) -> str:
     if tool_name == "execute_shell_command":
-        cmd = tool_args.get("command", "")
-        clean_cmd = cmd.strip().split("\n")[0]
-        if len(clean_cmd) > 65:
-            clean_cmd = clean_cmd[:62] + "..."
-        return f"⚙️ [Terminal] Exécution de execute_shell_command : {clean_cmd}"
+        cmd = tool_args.get("command", "").strip()
+        one_line = " ".join(cmd.split())
+        if len(one_line) > 75:
+            one_line = one_line[:72] + "..."
+        return f"⚙️ [Terminal] Exécution de execute_shell_command : {one_line}"
     elif tool_name == "manage_files":
         action = tool_args.get("action", "")
         path = tool_args.get("path", "")
@@ -263,6 +272,18 @@ class JarvisAgent:
             current_model = ""
             success_backend = False
 
+            # Filtrer dynamiquement les backends pour ignorer les modèles bannis/refroidis
+            active_backends = [b for b in backends if not router.is_model_dead(b[2])]
+            if not active_backends:
+                refreshed = await self._get_backends_for_model(requested_model, history)
+                active_backends = [b for b in refreshed if not router.is_model_dead(b[2])]
+                if refreshed:
+                    backends = refreshed
+
+            if not active_backends:
+                yield f"\n❌ Tous les modèles pour {requested_model} sont temporairement saturés ou indisponibles."
+                return
+
             if iteration == 10:
                 history.append({
                     "role": "system",
@@ -270,7 +291,7 @@ class JarvisAgent:
                 })
                 yield "\n⚠️ *Jarvis ressent de la fatigue cognitive (10 itérations). Appel à la prudence...*"
 
-            for b_name, client, model in backends:
+            for b_name, client, model in active_backends:
                 logger.info(f"[{b_name}] Itération {iteration + 1}, modèle: {model}")
                 try:
                     # FIX: Google Gemini strict validation requires proprietary thought_signature on toolCall parts.
@@ -287,7 +308,7 @@ class JarvisAgent:
                                     )
                                 text_content = msg.get("content") or ""
                                 text_content += (
-                                    f"\n(Action système exécutée : {', '.join(tc_descriptions)})"
+                                    f"\n(Action système : {', '.join(tc_descriptions)})"
                                 )
                                 sanitized_history.append(
                                     {
@@ -299,7 +320,7 @@ class JarvisAgent:
                                 sanitized_history.append(
                                     {
                                         "role": "user",
-                                        "content": f"(Résultat système de l'action) :\n{msg.get('content', '')}",
+                                        "content": f"(Résultat système) :\n{msg.get('content', '')}",
                                     }
                                 )
                             else:
@@ -312,10 +333,10 @@ class JarvisAgent:
                                 and "tool_calls" in msg_copy
                             ):
                                 if not msg_copy.get("content"):
-                                    msg_copy["content"] = "Exécution en cours..."
+                                    msg_copy["content"] = "" if "Ollama" in b_name else None
                             sanitized_history.append(msg_copy)
 
-                    current_max_tokens = 800 if "Groq" in b_name else 4096
+                    current_max_tokens = 2048 if "Groq" in b_name else 4096
                     stream_response = await client.chat.completions.create(
                         model=model,
                         messages=sanitized_history,
@@ -336,7 +357,7 @@ class JarvisAgent:
                             continue
                         delta = chunk.choices[0].delta
                         if delta.content:
-                            if "(Action système exécutée" in delta.content or "Exécution de l'outil en cours" in delta.content:
+                            if any(marker in delta.content for marker in ["(Action système", "Exécution de l'outil en cours"]):
                                 continue
                             final_text += delta.content
                             yield delta.content
@@ -374,7 +395,7 @@ class JarvisAgent:
 
                                     if getattr(tc_chunk.function, "name", None):
                                         tool_calls_dict[true_idx]["function"][
-                                            "name"
+                                             "name"
                                         ] += tc_chunk.function.name
                                     if getattr(tc_chunk.function, "arguments", None):
                                         tool_calls_dict[true_idx]["function"][
@@ -388,9 +409,7 @@ class JarvisAgent:
                 except Exception as e:
                     logger.warning(f"Backend stream {b_name} a échoué: {e}")
                     error_str = str(e)
-                    from jarvis.core.router import mark_model_dead
-
-                    mark_model_dead(model, error_str)
+                    router.mark_model_dead(model, error_str)
                     continue
 
             if not success_backend:
@@ -398,9 +417,7 @@ class JarvisAgent:
                 return
 
             assistant_msg = {"role": "assistant"}
-            # Fix Google Gemini 400 Bad Request (missing thought_signature)
-            # and Ollama strict parsing by ALWAYS providing content.
-            assistant_msg["content"] = final_text if final_text else "Exécution de l'outil en cours..."
+            assistant_msg["content"] = final_text if final_text else None
 
             tool_calls_list = []
             if tool_calls_dict:
@@ -446,6 +463,72 @@ class JarvisAgent:
                     )
                 continue
             else:
+                # Aucun outil appelé : tour de conclusion conversationnelle
+                had_tools_executed = any(m.get("role") == "tool" for m in history)
+                needs_synthesis = (not final_text.strip()) or (had_tools_executed and len(final_text.strip()) < 10)
+
+                if needs_synthesis:
+                    logger.info("Modèle silencieux après exécution d'outils. Lancement de la synthèse forcée (style Claude/Gemini)...")
+                    synth_history = []
+                    for msg in history:
+                        msg_c = msg.copy()
+                        if msg_c.get("role") == "tool":
+                            content_str = str(msg_c.get("content", ""))
+                            if len(content_str) > 1200:
+                                content_str = content_str[:1200] + "\n...(tronqué)"
+                            synth_history.append({
+                                "role": "user",
+                                "content": f"(Résultat d'action système) :\n{content_str}"
+                            })
+                        elif msg_c.get("role") == "assistant" and msg_c.get("tool_calls"):
+                            tc_summary = [f"{tc.get('function', {}).get('name', 'action')}" for tc in msg_c["tool_calls"]]
+                            synth_history.append({
+                                "role": "assistant",
+                                "content": f"Actions exécutées : {', '.join(tc_summary)}"
+                            })
+                        else:
+                            synth_history.append(msg_c)
+
+                    synth_history.append({
+                        "role": "user",
+                        "content": (
+                            "Jarvis, présente maintenant à Monsieur ta réponse finale complète et soignée : "
+                            "1) Synthétise clairement les actions effectuées et les résultats réels obtenus (adresses IP, ports ou fichiers vérifiés), "
+                            "2) Donne ton explication technique ou diagnostic concret, "
+                            "3) Propose la suite et demande l'avis de Monsieur."
+                        )
+                    })
+
+                    prefix = "\n\n" if last_char != "\n" else ""
+                    yield prefix
+
+                    synth_text = ""
+                    for s_b_name, s_client, s_model in active_backends:
+                        try:
+                            s_tokens = 2048 if "Groq" in s_b_name else 4096
+                            s_stream = await s_client.chat.completions.create(
+                                model=s_model,
+                                messages=synth_history,
+                                tools=None,
+                                max_tokens=s_tokens,
+                                temperature=0.7,
+                                stream=True,
+                            )
+                            async for s_chunk in s_stream:
+                                if not s_chunk.choices:
+                                    continue
+                                s_delta = s_chunk.choices[0].delta
+                                if s_delta.content:
+                                    synth_text += s_delta.content
+                                    yield s_delta.content
+                            if synth_text.strip():
+                                final_text = synth_text
+                                current_model = s_model
+                                break
+                        except Exception as s_err:
+                            logger.warning(f"Synthèse forcée avec {s_b_name} a échoué: {s_err}")
+                            continue
+
                 self.last_backend_used = current_model
                 return
 
